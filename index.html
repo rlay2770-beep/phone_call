@@ -26,7 +26,7 @@
     .header-user { font-size: 14px; font-weight: 600; }
     .btn-logout { background: #ff3b30; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: bold; }
 
-    /* User Directory (Online Users) */
+    /* User Directory */
     .users-bar { background: #f8f9fa; border-bottom: 1px solid #e9ecef; padding: 10px; }
     .users-bar label { font-size: 12px; color: #6c757d; font-weight: bold; display: block; margin-bottom: 5px; }
     .user-list { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; }
@@ -60,8 +60,8 @@
 
 <div class="app-card">
 
-  <!-- Audio Element for Playing Remote Voice Call -->
-  <audio id="remoteAudio" autoplay></audio>
+  <!-- Voice Player Elements -->
+  <audio id="remoteAudio" autoplay playsinline></audio>
 
   <!-- 1. Auth Screen -->
   <div id="authSection" class="auth-box">
@@ -135,18 +135,16 @@
   let selectedUser = null;
   let currentCallId = null;
 
-  // WebRTC Variables
+  // WebRTC Global State
   let peerConnection = null;
   let localStream = null;
   let remoteStream = null;
-  let callDocListener = null;
+  let activeCallUnsubscribe = null;
 
-  // WebRTC STUN Configuration
   const rtcConfig = {
     iceServers: [
       { urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }
-    ],
-    iceCandidatePoolSize: 10,
+    ]
   };
 
   auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
@@ -168,8 +166,7 @@
   }
 
   function confirmLogout() {
-    const check = confirm("အကောင့်မှ ထွက်မှာ သေချာပါသလားဆရာ?");
-    if (check) {
+    if (confirm("အကောင့်မှ ထွက်မှာ သေချာပါသလားဆရာ?")) {
       if (currentUser) {
         db.collection("users").doc(currentUser.uid).update({ online: false });
       }
@@ -193,7 +190,6 @@
     listenIncomingCalls();
   }
 
-  // 1. Listen for Online Users
   function listenOnlineUsers() {
     db.collection("users").onSnapshot(snapshot => {
       const usersList = document.getElementById('usersList');
@@ -213,7 +209,7 @@
       });
 
       if (count === 0) {
-        usersList.innerHTML = '<span style="font-size: 12px; color: #888;">အခြားသူများ မရှိသေးပါ (အကောင့်ဝင်သူ မရှိသေးပါ)</span>';
+        usersList.innerHTML = '<span style="font-size: 12px; color: #888;">အခြားသူများ မရှိသေးပါ</span>';
       }
     });
   }
@@ -226,7 +222,6 @@
     loadPrivateMessages();
   }
 
-  // 2. Private Messages Listener
   function loadPrivateMessages() {
     if (!selectedUser) return;
     const chatRoomId = getChatRoomId(currentUser.uid, selectedUser.uid);
@@ -255,25 +250,18 @@
   }
 
   function sendMessage() {
-    if (!selectedUser) {
-      alert("ကျေးဇူးပြု၍ စာပို့လိုသူကို အရင်ရွေးချယ်ပါဆရာ");
-      return;
-    }
-
+    if (!selectedUser) return;
     const input = document.getElementById('msgInput');
     const text = input.value.trim();
     if (!text) return;
 
     const chatRoomId = getChatRoomId(currentUser.uid, selectedUser.uid);
-
     db.collection("chats").doc(chatRoomId).collection("messages").add({
       text: text,
       senderUid: currentUser.uid,
       receiverUid: selectedUser.uid,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    }).then(() => {
-      input.value = '';
-    });
+    }).then(() => input.value = '');
   }
 
   function getChatRoomId(uid1, uid2) {
@@ -281,104 +269,85 @@
   }
 
   // -------------------------------------------------------------
-  // 3. WEBRTC VOICE CALLING SYSTEM
+  // CALL SYSTEM & WEBRTC ENGINE
   // -------------------------------------------------------------
 
-  async function setupPeerConnection(callDocRef) {
+  async function createPeerConnection(callDocRef) {
     peerConnection = new RTCPeerConnection(rtcConfig);
 
-    // Get Microphone Access
     try {
       localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-    } catch (err) {
-      alert("မိုက်ခရိုဖုန်း အသုံးပြုခွင့် ပေးပါ: " + err.message);
+    } catch (e) {
+      alert("မိုက်ခရိုဖုန်း ခွင့်ပြုချက် မရရှိပါ: " + e.message);
       endCall();
-      return;
+      return null;
     }
 
-    // Handle Incoming Audio Tracks
     remoteStream = new MediaStream();
     peerConnection.ontrack = (event) => {
-      event.streams[0].getTracks().forEach(track => {
-        remoteStream.addTrack(track);
-      });
-      document.getElementById('remoteAudio').srcObject = remoteStream;
+      event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
+      const remoteAudio = document.getElementById('remoteAudio');
+      remoteAudio.srcObject = remoteStream;
+      remoteAudio.play().catch(err => console.log("Autoplay blocked setup:", err));
     };
 
-    // Store Subcollections
-    const callerCandidates = callDocRef.collection('callerCandidates');
-    const receiverCandidates = callDocRef.collection('receiverCandidates');
-
-    return { callerCandidates, receiverCandidates };
+    return peerConnection;
   }
 
-  // Caller: Starts the Call
+  // 1. Start Call (Caller Side)
   async function startCall() {
     if (!selectedUser) return;
 
     currentCallId = getChatRoomId(currentUser.uid, selectedUser.uid);
     const callDocRef = db.collection("calls").doc(currentCallId);
 
-    const { callerCandidates, receiverCandidates } = await setupPeerConnection(callDocRef);
+    const pc = await createPeerConnection(callDocRef);
+    if (!pc) return;
 
-    // Collect ICE Candidates for Caller
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        callerCandidates.add(event.candidate.toJSON());
-      }
-    };
+    const callerCandidates = callDocRef.collection('callerCandidates');
+    pc.onicecandidate = (e) => e.candidate && callerCandidates.add(e.candidate.toJSON());
 
-    // Create SDP Offer
-    const offerDescription = await peerConnection.createOffer();
-    await peerConnection.setLocalDescription(offerDescription);
+    const offerDescription = await pc.createOffer();
+    await pc.setLocalDescription(offerDescription);
 
-    const offer = {
-      sdp: offerDescription.sdp,
-      type: offerDescription.type
-    };
-
-    // Save Call Record to Firestore
     await callDocRef.set({
       callerUid: currentUser.uid,
       callerName: currentUser.displayName || currentUser.email,
       receiverUid: selectedUser.uid,
-      offer: offer,
+      offer: { type: offerDescription.type, sdp: offerDescription.sdp },
       status: "calling",
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     });
 
-    // UI Updates
     document.getElementById('callOverlay').classList.remove('hidden');
     document.getElementById('callStatusText').innerText = `${selectedUser.name} ထံ ဖုန်းခေါ်ဆိုနေပါသည်...`;
     document.getElementById('callActions').innerHTML = `<button class="btn-reject" onclick="endCall()">ဖုန်းချမည်</button>`;
 
-    // Listen for Call Answer and Status Sync
-    callDocListener = callDocRef.onSnapshot(async (snapshot) => {
-      const data = snapshot.data();
-      if (!data) return;
+    // Global Sync Listener for Caller
+    listenCallDocument(currentCallId);
 
-      if (data.status === "ended") {
-        hideCallUI();
-      } else if (data.answer && !peerConnection.currentRemoteDescription) {
+    // Listen to Answer SDP
+    callDocRef.onSnapshot(async (doc) => {
+      const data = doc.data();
+      if (data && data.answer && !pc.currentRemoteDescription) {
         const answerDescription = new RTCSessionDescription(data.answer);
-        await peerConnection.setRemoteDescription(answerDescription);
+        await pc.setRemoteDescription(answerDescription);
         document.getElementById('callStatusText').innerText = "ဖုန်းပြောနေပါသည်...";
       }
     });
 
-    // Listen for Receiver ICE Candidates
-    receiverCandidates.onSnapshot((snapshot) => {
-      snapshot.docChanges().forEach((change) => {
+    // Listen to Receiver Candidates
+    callDocRef.collection('receiverCandidates').onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(change => {
         if (change.type === 'added') {
-          const candidate = new RTCIceCandidate(change.doc.data());
-          peerConnection.addIceCandidate(candidate);
+          pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
         }
       });
     });
   }
 
-  // Receiver: Listens for Incoming Calls
+  // 2. Incoming Call Listener (Receiver Side)
   function listenIncomingCalls() {
     db.collection("calls").where("receiverUid", "==", currentUser.uid)
       .onSnapshot(snapshot => {
@@ -388,51 +357,49 @@
             if (data.status === "calling" && data.callerUid !== currentUser.uid) {
               currentCallId = change.doc.id;
               showIncomingCallUI(data.callerName);
-              trackCallState(currentCallId);
-            } else if (data.status === "ended") {
-              hideCallUI();
+              listenCallDocument(currentCallId);
             }
           }
         });
       });
   }
 
-  // Receiver: Accepts the Call
+  function showIncomingCallUI(callerName) {
+    document.getElementById('callOverlay').classList.remove('hidden');
+    document.getElementById('callStatusText').innerText = `ဖုန်းဝင်လာပါသည်!`;
+    document.getElementById('callerNameText').innerText = `${callerName} ထံမှ ဖုန်းခေါ်ဆိုနေသည်`;
+    document.getElementById('callActions').innerHTML = `
+      <button class="btn-accept" onclick="acceptCall()">ကိုင်မည်</button>
+      <button class="btn-reject" onclick="endCall()">ငြင်းမည်</button>
+    `;
+  }
+
+  // 3. Accept Call (Receiver Action)
   async function acceptCall() {
     if (!currentCallId) return;
     const callDocRef = db.collection("calls").doc(currentCallId);
     const callData = (await callDocRef.get()).data();
+    if (!callData) return;
 
-    const { callerCandidates, receiverCandidates } = await setupPeerConnection(callDocRef);
+    const pc = await createPeerConnection(callDocRef);
+    if (!pc) return;
 
-    // Collect ICE Candidates for Receiver
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        receiverCandidates.add(event.candidate.toJSON());
-      }
-    };
+    const receiverCandidates = callDocRef.collection('receiverCandidates');
+    pc.onicecandidate = (e) => e.candidate && receiverCandidates.add(e.candidate.toJSON());
 
-    // Set Remote Offer
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(callData.offer));
+    await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
+    const answerDescription = await pc.createAnswer();
+    await pc.setLocalDescription(answerDescription);
 
-    // Create SDP Answer
-    const answerDescription = await peerConnection.createAnswer();
-    await peerConnection.setLocalDescription(answerDescription);
+    await callDocRef.update({
+      answer: { type: answerDescription.type, sdp: answerDescription.sdp },
+      status: "connected"
+    });
 
-    const answer = {
-      type: answerDescription.type,
-      sdp: answerDescription.sdp
-    };
-
-    // Update Firestore to Connected
-    await callDocRef.update({ answer: answer, status: "connected" });
-
-    // Listen for Caller ICE Candidates
-    callerCandidates.onSnapshot((snapshot) => {
-      snapshot.docChanges().forEach((change) => {
+    callDocRef.collection('callerCandidates').onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(change => {
         if (change.type === 'added') {
-          const candidate = new RTCIceCandidate(change.doc.data());
-          peerConnection.addIceCandidate(candidate);
+          pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
         }
       });
     });
@@ -441,27 +408,29 @@
     document.getElementById('callActions').innerHTML = `<button class="btn-reject" onclick="endCall()">ဖုန်းချမည်</button>`;
   }
 
-  // Sync Call Termination Across Devices
-  function trackCallState(callId) {
-    if (callDocListener) callDocListener(); // Unsubscribe previous listener if any
-    callDocListener = db.collection("calls").doc(callId).onSnapshot(doc => {
+  // Dynamic Listener for Realtime State Sync (Ended / Rejected)
+  function listenCallDocument(callId) {
+    if (activeCallUnsubscribe) activeCallUnsubscribe();
+
+    activeCallUnsubscribe = db.collection("calls").doc(callId).onSnapshot(doc => {
       const data = doc.data();
-      if (data && data.status === "ended") {
-        hideCallUI();
+      if (!data || data.status === "ended" || data.status === "rejected") {
+        cleanupCallUI();
       }
     });
   }
 
-  // End Call & Clean Resources
+  // 4. End / Decline Call Engine
   async function endCall() {
     if (currentCallId) {
-      await db.collection("calls").doc(currentCallId).update({ status: "ended" }).catch(() => {});
+      const callDocRef = db.collection("calls").doc(currentCallId);
+      await callDocRef.update({ status: "ended" }).catch(() => {});
     }
-    hideCallUI();
+    cleanupCallUI();
   }
 
-  function hideCallUI() {
-    // Stop Peer Connection & Audio Streams
+  // Clean WebRTC Stream Memory & Elements
+  function cleanupCallUI() {
     if (peerConnection) {
       peerConnection.close();
       peerConnection = null;
@@ -470,16 +439,17 @@
       localStream.getTracks().forEach(track => track.stop());
       localStream = null;
     }
-    if (callDocListener) {
-      callDocListener();
-      callDocListener = null;
+    if (activeCallUnsubscribe) {
+      activeCallUnsubscribe();
+      activeCallUnsubscribe = null;
     }
 
     currentCallId = null;
     document.getElementById('callOverlay').classList.add('hidden');
+    document.getElementById('remoteAudio').srcObject = null;
   }
 </script>
 
 </body>
-                                                                   </html>
+  </html>
   
