@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phone Call & Private Chat App</title>
+
+  <!-- Firebase Web SDK v10.8.0 -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: #eef2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 10px; }
+    
+    .app-card { background: #ffffff; width: 100%; max-width: 420px; height: 92vh; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+    .hidden { display: none !important; }
+
+    /* Auth Screen */
+    .auth-box { padding: 30px 20px; display: flex; flex-direction: column; gap: 15px; justify-content: center; height: 100%; text-align: center; }
+    .btn-google { background: #4285f4; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 15px; }
+
+    /* App Header */
+    .app-header { background: #007aff; color: white; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
+    .header-user { font-size: 14px; font-weight: 600; }
+    .btn-logout { background: #ff3b30; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: bold; }
+
+    /* User Directory (Online Users) */
+    .users-bar { background: #f8f9fa; border-bottom: 1px solid #e9ecef; padding: 10px; }
+    .users-bar label { font-size: 12px; color: #6c757d; font-weight: bold; display: block; margin-bottom: 5px; }
+    .user-list { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; }
+    .user-chip { background: #ffffff; border: 1px solid #ced4da; padding: 6px 12px; border-radius: 20px; font-size: 13px; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+    .user-chip.active { background: #007aff; color: white; border-color: #007aff; }
+    .online-dot { width: 8px; height: 8px; background: #28a745; border-radius: 50%; }
+
+    /* Target User Header */
+    .target-header { background: #f1f3f5; padding: 8px 12px; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: bold; }
+    .btn-call { background: #28a745; color: white; border: none; padding: 6px 14px; border-radius: 15px; cursor: pointer; font-weight: bold; }
+
+    /* Chat Area */
+    .chat-box { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #fafafa; }
+    .msg { padding: 10px 14px; border-radius: 12px; font-size: 14px; max-width: 80%; word-break: break-word; line-height: 1.4; }
+    .msg.me { background: #007aff; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+    .msg.them { background: #e9ecef; color: #212529; align-self: flex-start; border-bottom-left-radius: 2px; }
+
+    /* Input Area - Extended Height for Multiline */
+    .input-bar { padding: 10px; background: #fff; border-top: 1px solid #e9ecef; display: flex; gap: 8px; align-items: flex-end; }
+    .input-bar textarea { flex: 1; padding: 10px; border: 1px solid #ced4da; border-radius: 10px; outline: none; font-size: 14px; resize: none; height: 50px; font-family: inherit; }
+    .btn-send { background: #007aff; color: white; border: none; padding: 12px 18px; border-radius: 10px; font-weight: bold; cursor: pointer; height: 50px; }
+
+    /* Call Overlay */
+    .call-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; z-index: 100; text-align: center; padding: 20px; }
+    .call-actions { display: flex; gap: 15px; }
+    .btn-accept { background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 20px; font-weight: bold; cursor: pointer; }
+    .btn-reject { background: #dc3545; color: white; border: none; padding: 12px 24px; border-radius: 20px; font-weight: bold; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<div class="app-card">
+
+  <!-- 1. Auth Screen -->
+  <div id="authSection" class="auth-box">
+    <h2>ဖုန်းခေါ်ဆိုမှု နှင့် စာပို့စနစ်</h2>
+    <p style="font-size: 13px; color: #666;">စတင်အသုံးပြုရန် အကောင့်ဝင်ပါ</p>
+    <button class="btn-google" onclick="loginWithGoogle()">Google Account ဖြင့် ဝင်မည်</button>
+  </div>
+
+  <!-- 2. Main App Screen -->
+  <div id="appSection" class="hidden" style="display: flex; flex-direction: column; height: 100%;">
+    
+    <div class="app-header">
+      <div class="header-user">မိမိ: <span id="userNameDisplay">...</span></div>
+      <button class="btn-logout" onclick="confirmLogout()">ထွက်မည်</button>
+    </div>
+
+    <!-- Active Online Users -->
+    <div class="users-bar">
+      <label>အွန်လိုင်းရောက်နေသူများ (စာပြောရန် နှိပ်ပါ):</label>
+      <div class="user-list" id="usersList">
+        <span style="font-size: 12px; color: #888;">အခြားသူများ မရှိသေးပါ</span>
+      </div>
+    </div>
+
+    <!-- Chat Target Header -->
+    <div class="target-header">
+      <div>စကားပြောနေသူ: <span id="targetUserName" style="color:#007aff;">မရွေးချယ်ရသေးပါ</span></div>
+      <button id="callBtn" class="btn-call hidden" onclick="startCall()">📞 Call</button>
+    </div>
+
+    <!-- Chat View -->
+    <div class="chat-box" id="chatBox">
+      <p style="text-align: center; color: #888; font-size: 13px; margin-top: 20px;">
+        စကားပြောလိုသည့် သူ၏ နာမည်ကို အပေါ်တွင် ရွေးချယ်ပေးပါ
+      </p>
+    </div>
+
+    <!-- Input Bar -->
+    <div class="input-bar">
+      <textarea id="msgInput" placeholder="စာရိုက်ပါ... (Enter ဖြင့် စာကြောင်းဆင်းနိုင်ပါသည်)"></textarea>
+      <button class="btn-send" onclick="sendMessage()">ပို့မည်</button>
+    </div>
+  </div>
+
+  <!-- 3. Call Incoming/Outgoing Overlay -->
+  <div id="callOverlay" class="call-overlay hidden">
+    <h3 id="callStatusText">ဖုန်းခေါ်ဆိုနေပါသည်...</h3>
+    <p id="callerNameText" style="font-size: 14px; color: #ccc;"></p>
+    <div class="call-actions" id="callActions">
+      <button class="btn-reject" onclick="endCall()">ဖုန်းချမည်</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyD_qwmzPYB_W0knSobETMGKKH3YhtVIaow",
+    authDomain: "phone-call-20830.firebaseapp.com",
+    projectId: "phone-call-20830",
+    storageBucket: "phone-call-20830.firebasestorage.app",
+    messagingSenderId: "879161246559",
+    appId: "1:879161246559:android:72fcdf7063f8c5c882acea"
+  };
+
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  let currentUser = null;
+  let selectedUser = null; // Private ChatTarget
+  let currentCallId = null;
+
+  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      currentUser = user;
+      onLoginSuccess(user);
+    } else {
+      currentUser = null;
+      document.getElementById('authSection').classList.remove('hidden');
+      document.getElementById('appSection').classList.add('hidden');
+    }
+  });
+
+  function loginWithGoogle() {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(err => alert("Login Error: " + err.message));
+  }
+
+  function confirmLogout() {
+    const check = confirm("အကောင့်မှ ထွက်မှာ သေချာပါသလားဆရာ?");
+    if (check) {
+      if (currentUser) {
+        db.collection("users").doc(currentUser.uid).update({ online: false });
+      }
+      auth.signOut();
+    }
+  }
+
+  function onLoginSuccess(user) {
+    document.getElementById('authSection').classList.add('hidden');
+    document.getElementById('appSection').classList.remove('hidden');
+    document.getElementById('userNameDisplay').innerText = user.displayName || user.email;
+
+    // Save/Update User Status in DB
+    db.collection("users").doc(user.uid).set({
+      name: user.displayName || user.email,
+      uid: user.uid,
+      online: true,
+      lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    listenOnlineUsers();
+    listenIncomingCalls();
+  }
+
+  // 1. Listen for Online Users (Private List)
+  function listenOnlineUsers() {
+    db.collection("users").onSnapshot(snapshot => {
+      const usersList = document.getElementById('usersList');
+      usersList.innerHTML = '';
+      let count = 0;
+
+      snapshot.forEach(doc => {
+        const u = doc.data();
+        if (u.uid !== currentUser.uid) { // Don't show myself
+          count++;
+          const chip = document.createElement('div');
+          chip.className = `user-chip ${selectedUser && selectedUser.uid === u.uid ? 'active' : ''}`;
+          chip.innerHTML = `<span class="online-dot"></span> ${u.name}`;
+          chip.onclick = () => selectUserForChat(u);
+          usersList.appendChild(chip);
+        }
+      });
+
+      if (count === 0) {
+        usersList.innerHTML = '<span style="font-size: 12px; color: #888;">အခြားသူများ မရှိသေးပါ (အကောင့်ဝင်သူ မရှိသေးပါ)</span>';
+      }
+    });
+  }
+
+  // Select User for 1-on-1 Private Chat
+  function selectUserForChat(user) {
+    selectedUser = user;
+    document.getElementById('targetUserName').innerText = user.name;
+    document.getElementById('callBtn').classList.remove('hidden');
+    listenOnlineUsers(); // Refresh UI Active class
+    loadPrivateMessages();
+  }
+
+  // 2. Private Messages Listener (1-on-1 Only)
+  function loadPrivateMessages() {
+    if (!selectedUser) return;
+
+    const chatRoomId = getChatRoomId(currentUser.uid, selectedUser.uid);
+
+    db.collection("chats").doc(chatRoomId).collection("messages")
+      .orderBy("timestamp", "asc")
+      .onSnapshot(snapshot => {
+        const chatBox = document.getElementById('chatBox');
+        chatBox.innerHTML = '';
+
+        if (snapshot.empty) {
+          chatBox.innerHTML = `<p style="text-align: center; color: #888; font-size: 13px; margin-top: 20px;">${selectedUser.name} နှင့် စာများ စတင်ပို့နိုင်ပါပြီ</p>`;
+          return;
+        }
+
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const isMe = data.senderUid === currentUser.uid;
+          const div = document.createElement('div');
+          div.className = `msg ${isMe ? 'me' : 'them'}`;
+          div.innerText = data.text;
+          chatBox.appendChild(div);
+        });
+        chatBox.scrollTop = chatBox.scrollHeight;
+      });
+  }
+
+  function sendMessage() {
+    if (!selectedUser) {
+      alert("ကျေးဇူးပြု၍ စာပို့လိုသူကို အရင်ရွေးချယ်ပါဆရာ");
+      return;
+    }
+
+    const input = document.getElementById('msgInput');
+    const text = input.value.trim();
+    if (!text) return;
+
+    const chatRoomId = getChatRoomId(currentUser.uid, selectedUser.uid);
+
+    db.collection("chats").doc(chatRoomId).collection("messages").add({
+      text: text,
+      senderUid: currentUser.uid,
+      receiverUid: selectedUser.uid,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(() => {
+      input.value = '';
+    });
+  }
+
+  // Helper ID for Private Chat Room
+  function getChatRoomId(uid1, uid2) {
+    return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
+  }
+
+  // 3. User to User Calling System
+  function startCall() {
+    if (!selectedUser) return;
+
+    currentCallId = getChatRoomId(currentUser.uid, selectedUser.uid);
+
+    db.collection("calls").doc(currentCallId).set({
+      callerUid: currentUser.uid,
+      callerName: currentUser.displayName || currentUser.email,
+      receiverUid: selectedUser.uid,
+      status: "calling",
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    document.getElementById('callOverlay').classList.remove('hidden');
+    document.getElementById('callStatusText').innerText = `${selectedUser.name} ထံ ဖုန်းခေါ်ဆိုနေပါသည်...`;
+    document.getElementById('callActions').innerHTML = `<button class="btn-reject" onclick="endCall()">ဖုန်းချမည်</button>`;
+  }
+
+  function listenIncomingCalls() {
+    db.collection("calls").where("receiverUid", "==", currentUser.uid)
+      .onSnapshot(snapshot => {
+        snapshot.docChanges().forEach(change => {
+          const data = change.doc.data();
+          if (change.type === "added" || change.type === "modified") {
+            if (data.status === "calling") {
+              currentCallId = change.doc.id;
+              showIncomingCallUI(data.callerName);
+            } else if (data.status === "ended") {
+              hideCallUI();
+            }
+          }
+        });
+      });
+  }
+
+  function showIncomingCallUI(callerName) {
+    document.getElementById('callOverlay').classList.remove('hidden');
+    document.getElementById('callStatusText').innerText = `ဖုန်းဝင်လာပါသည်!`;
+    document.getElementById('callerNameText').innerText = `${callerName} ထံမှ ဖုန်းခေါ်ဆိုနေသည်`;
+    document.getElementById('callActions').innerHTML = `
+      <button class="btn-accept" onclick="acceptCall()">ကိုင်မည်</button>
+      <button class="btn-reject" onclick="endCall()">ငြင်းမည်</button>
+    `;
+  }
+
+  function acceptCall() {
+    db.collection("calls").doc(currentCallId).update({ status: "connected" });
+    document.getElementById('callStatusText').innerText = "ဖုန်းပြောနေပါသည်...";
+    document.getElementById('callActions').innerHTML = `<button class="btn-reject" onclick="endCall()">ဖုန်းချမည်</button>`;
+  }
+
+  function endCall() {
+    if (currentCallId) {
+      db.collection("calls").doc(currentCallId).update({ status: "ended" });
+    }
+    hideCallUI();
+  }
+
+  function hideCallUI() {
+    document.getElementById('callOverlay').classList.add('hidden');
+  }
+</script>
+
+</body>
+    </html>
+    
