@@ -26,7 +26,7 @@
     .header-user { font-size: 14px; font-weight: 600; }
     .btn-logout { background: #ff3b30; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: bold; }
 
-    /* User Directory (Online Users) */
+    /* User Directory */
     .users-bar { background: #f8f9fa; border-bottom: 1px solid #e9ecef; padding: 10px; }
     .users-bar label { font-size: 12px; color: #6c757d; font-weight: bold; display: block; margin-bottom: 5px; }
     .user-list { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; }
@@ -44,23 +44,38 @@
     .msg.me { background: #007aff; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
     .msg.them { background: #e9ecef; color: #212529; align-self: flex-start; border-bottom-left-radius: 2px; }
 
-    /* Input Area - Extended Height for Multiline */
+    /* Input Area */
     .input-bar { padding: 10px; background: #fff; border-top: 1px solid #e9ecef; display: flex; gap: 8px; align-items: flex-end; }
     .input-bar textarea { flex: 1; padding: 10px; border: 1px solid #ced4da; border-radius: 10px; outline: none; font-size: 14px; resize: none; height: 50px; font-family: inherit; }
     .btn-send { background: #007aff; color: white; border: none; padding: 12px 18px; border-radius: 10px; font-weight: bold; cursor: pointer; height: 50px; }
 
-    /* Call Overlay */
-    .call-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; z-index: 100; text-align: center; padding: 20px; }
-    .call-actions { display: flex; gap: 15px; }
+    /* Call Overlay & Glowing Flash Animation */
+    .call-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; z-index: 100; text-align: center; padding: 20px; }
+    
+    /* မီးလင်း flash effect */
+    .call-overlay.flashing {
+      animation: pulseBg 1s infinite alternate;
+    }
+    @keyframes pulseBg {
+      0% { background: rgba(0, 30, 80, 0.95); box-shadow: inset 0 0 50px #007aff; }
+      100% { background: rgba(100, 0, 0, 0.95); box-shadow: inset 0 0 50px #ff3b30; }
+    }
+
+    .call-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
     .btn-accept { background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 20px; font-weight: bold; cursor: pointer; }
     .btn-reject { background: #dc3545; color: white; border: none; padding: 12px 24px; border-radius: 20px; font-weight: bold; cursor: pointer; }
+    .btn-ctrl { background: #495057; color: white; border: none; padding: 10px 16px; border-radius: 18px; font-size: 13px; font-weight: bold; cursor: pointer; }
+    .btn-ctrl.off { background: #e63946; }
+
+    .volume-box { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 10px; font-size: 12px; color: #ccc; }
+    .volume-box input[type="range"] { width: 160px; accent-color: #007aff; cursor: pointer; }
   </style>
 </head>
 <body>
 
 <div class="app-card">
 
-  <!-- အသံထွက်စေရန် Audio Element ထည့်သွင်းထားသည် -->
+  <!-- Remote Audio Playback Element -->
   <audio id="remoteAudio" autoplay playsinline></audio>
 
   <!-- 1. Auth Screen -->
@@ -110,7 +125,18 @@
   <div id="callOverlay" class="call-overlay hidden">
     <h3 id="callStatusText">ဖုန်းခေါ်ဆိုနေပါသည်...</h3>
     <p id="callerNameText" style="font-size: 14px; color: #ccc;"></p>
-    <div class="call-actions" id="callActions">
+    
+    <!-- အသံ ထိန်းချုပ်မှု ခလုတ်များ -->
+    <div class="volume-box hidden" id="audioControls">
+      <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+        <button id="toggleMicBtn" class="btn-ctrl" onclick="toggleMic()">🎙️ Mic On</button>
+        <button id="toggleAudioBtn" class="btn-ctrl" onclick="toggleAudio()">🔊 Audio On</button>
+      </div>
+      <label for="volumeSlider">အသံအတိုး/အကျယ် စိမ်ရန်:</label>
+      <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1" oninput="changeVolume(this.value)">
+    </div>
+
+    <div class="call-actions" id="callActions" style="margin-top: 15px;">
       <button class="btn-reject" onclick="endCall()">ဖုန်းချမည်</button>
     </div>
   </div>
@@ -135,11 +161,17 @@
   let selectedUser = null; 
   let currentCallId = null;
 
-  // WebRTC & Audio Variables
+  // WebRTC & Controls
   let peerConnection = null;
   let localStream = null;
   let remoteStream = null;
   let callStateUnsubscribe = null;
+  let isMicMuted = false;
+  let isAudioMuted = false;
+
+  // Ringtone Audio Synthesizer
+  let audioCtx = null;
+  let ringtoneInterval = null;
 
   const rtcConfig = {
     iceServers: [
@@ -278,14 +310,78 @@
   }
 
   // -------------------------------------------------------------
-  // WEBRTC VOICE AUDIO + REAL-TIME SYNC LOGIC
+  // SOUND & FLASHING LIGHT SYSTEM (Ringtone Engine)
+  // -------------------------------------------------------------
+  function playTone(freq1, freq2, duration) {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc1 = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      osc1.frequency.value = freq1;
+      osc2.frequency.value = freq2;
+
+      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+
+      osc1.connect(gainNode);
+      osc2.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      osc1.start();
+      osc2.start();
+      setTimeout(() => {
+        osc1.stop();
+        osc2.stop();
+      }, duration);
+    } catch (e) {
+      console.log("Audio Tone Error:", e);
+    }
+  }
+
+  function startRingtone(type) {
+    stopRingtone(); // Reset any playing ringtone
+    document.getElementById('callOverlay').classList.add('flashing'); // မီးလင်း Animation ဖွင့်မည်
+
+    if (type === 'outgoing') {
+      // Outgoing Ringback Sound (တီ... တီ...)
+      playTone(440, 480, 1500);
+      ringtoneInterval = setInterval(() => {
+        playTone(440, 480, 1500);
+      }, 4000);
+    } else if (type === 'incoming') {
+      // Incoming Ringtone (ကျယ်လောင်သော ဖုန်းဝင်သံ)
+      playTone(850, 950, 800);
+      ringtoneInterval = setInterval(() => {
+        playTone(850, 950, 800);
+      }, 2000);
+    }
+  }
+
+  function stopRingtone() {
+    if (ringtoneInterval) {
+      clearInterval(ringtoneInterval);
+      ringtoneInterval = null;
+    }
+    document.getElementById('callOverlay').classList.remove('flashing'); // မီးလင်း Animation ပိတ်မည်
+  }
+
+  // -------------------------------------------------------------
+  // WEBRTC CALL SYSTEM
   // -------------------------------------------------------------
 
   async function initAudioPeerConnection(callDocRef) {
     peerConnection = new RTCPeerConnection(rtcConfig);
 
     try {
-      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      localStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        },
+        video: false
+      });
       localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
     } catch (err) {
       alert("မိုက်ခရိုဖုန်း အသုံးပြုခွင့် ပေးရန် လိုအပ်ပါသည်။");
@@ -298,13 +394,14 @@
       event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
       const remoteAudio = document.getElementById('remoteAudio');
       remoteAudio.srcObject = remoteStream;
+      remoteAudio.volume = document.getElementById('volumeSlider').value;
       remoteAudio.play().catch(e => console.log("Audio Playback Error:", e));
     };
 
     return peerConnection;
   }
 
-  // 1. Call Start (Caller)
+  // 1. Start Call (Caller)
   async function startCall() {
     if (!selectedUser) return;
 
@@ -332,15 +429,19 @@
     });
 
     document.getElementById('callOverlay').classList.remove('hidden');
+    document.getElementById('audioControls').classList.remove('hidden');
     document.getElementById('callStatusText').innerText = `${selectedUser.name} ထံ ဖုန်းခေါ်ဆိုနေပါသည်...`;
     document.getElementById('callActions').innerHTML = `<button class="btn-reject" onclick="endCall()">ဖုန်းချမည်</button>`;
 
-    // Monitor for Call Acceptance, Disconnection & Rejection Sync
+    // စတင်ခေါ်ဆိုချိန်တွင် Ringtone အသံနှင့် မီးလင်းစနစ် စတင်မည်
+    startRingtone('outgoing');
+
     listenCallStatusSync(currentCallId);
 
     callDocRef.onSnapshot(async snapshot => {
       const data = snapshot.data();
       if (data && data.answer && !pc.currentRemoteDescription) {
+        stopRingtone(); // ဖုန်းကိုင်လိုက်သည်နှင့် Ringtone အသံ/မီး ပိတ်မည်
         const answerDescription = new RTCSessionDescription(data.answer);
         await pc.setRemoteDescription(answerDescription);
         document.getElementById('callStatusText').innerText = "ဖုန်းပြောနေပါသည်...";
@@ -375,16 +476,22 @@
 
   function showIncomingCallUI(callerName) {
     document.getElementById('callOverlay').classList.remove('hidden');
+    document.getElementById('audioControls').classList.add('hidden');
     document.getElementById('callStatusText').innerText = `ဖုန်းဝင်လာပါသည်!`;
     document.getElementById('callerNameText').innerText = `${callerName} ထံမှ ဖုန်းခေါ်ဆိုနေသည်`;
     document.getElementById('callActions').innerHTML = `
       <button class="btn-accept" onclick="acceptCall()">ကိုင်မည်</button>
       <button class="btn-reject" onclick="endCall()">ငြင်းမည်</button>
     `;
+
+    // ဖုန်းဝင်လာချိန်တွင် Incoming Ringtone အသံနှင့် မီးလင်းစနစ် ဖွင့်မည်
+    startRingtone('incoming');
   }
 
   // 3. Accept Call (Receiver)
   async function acceptCall() {
+    stopRingtone(); // ဖုန်းကိုင်လိုက်လျှင် Ringtone အသံ/မီး ပိတ်မည်
+
     if (!currentCallId) return;
     const callDocRef = db.collection("calls").doc(currentCallId);
     const callData = (await callDocRef.get()).data();
@@ -415,11 +522,37 @@
       });
     });
 
+    document.getElementById('audioControls').classList.remove('hidden');
     document.getElementById('callStatusText').innerText = "ဖုန်းပြောနေပါသည်...";
     document.getElementById('callActions').innerHTML = `<button class="btn-reject" onclick="endCall()">ဖုန်းချမည်</button>`;
   }
 
-  // Sync Status for both Caller and Receiver (Close call immediately if status is "ended")
+  function toggleMic() {
+    if (!localStream) return;
+    const audioTrack = localStream.getAudioTracks()[0];
+    if (audioTrack) {
+      isMicMuted = !isMicMuted;
+      audioTrack.enabled = !isMicMuted;
+      const btn = document.getElementById('toggleMicBtn');
+      btn.innerText = isMicMuted ? "🎙️ Mic Off" : "🎙️ Mic On";
+      btn.classList.toggle('off', isMicMuted);
+    }
+  }
+
+  function toggleAudio() {
+    const remoteAudio = document.getElementById('remoteAudio');
+    isAudioMuted = !isAudioMuted;
+    remoteAudio.muted = isAudioMuted;
+    const btn = document.getElementById('toggleAudioBtn');
+    btn.innerText = isAudioMuted ? "🔇 Muted" : "🔊 Audio On";
+    btn.classList.toggle('off', isAudioMuted);
+  }
+
+  function changeVolume(val) {
+    const remoteAudio = document.getElementById('remoteAudio');
+    remoteAudio.volume = val;
+  }
+
   function listenCallStatusSync(callId) {
     if (callStateUnsubscribe) callStateUnsubscribe();
     callStateUnsubscribe = db.collection("calls").doc(callId).onSnapshot(doc => {
@@ -430,16 +563,18 @@
     });
   }
 
-  // 4. End / Decline Call (Both Sides)
+  // 4. End Call
   async function endCall() {
+    stopRingtone();
     if (currentCallId) {
       await db.collection("calls").doc(currentCallId).update({ status: "ended" }).catch(() => {});
     }
     hideCallUI();
   }
 
-  // Cleanup Resources & Streams
   function hideCallUI() {
+    stopRingtone(); // ဖုန်းချသည့်အခါ Ringtone နှင့် မီးလင်းခြင်း ချက်ချင်း ရပ်မည်
+
     if (peerConnection) {
       peerConnection.close();
       peerConnection = null;
@@ -454,11 +589,14 @@
     }
 
     currentCallId = null;
+    isMicMuted = false;
+    isAudioMuted = false;
+
     document.getElementById('callOverlay').classList.add('hidden');
+    document.getElementById('audioControls').classList.add('hidden');
     document.getElementById('remoteAudio').srcObject = null;
   }
 </script>
 
 </body>
-                                                                                 </html>
-  
+</html>
