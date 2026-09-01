@@ -26,7 +26,7 @@
     .header-user { font-size: 14px; font-weight: 600; }
     .btn-logout { background: #ff3b30; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: bold; }
 
-    /* User Directory */
+    /* User Directory (Online Users) */
     .users-bar { background: #f8f9fa; border-bottom: 1px solid #e9ecef; padding: 10px; }
     .users-bar label { font-size: 12px; color: #6c757d; font-weight: bold; display: block; margin-bottom: 5px; }
     .user-list { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; }
@@ -44,7 +44,7 @@
     .msg.me { background: #007aff; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
     .msg.them { background: #e9ecef; color: #212529; align-self: flex-start; border-bottom-left-radius: 2px; }
 
-    /* Input Area */
+    /* Input Area - Extended Height for Multiline */
     .input-bar { padding: 10px; background: #fff; border-top: 1px solid #e9ecef; display: flex; gap: 8px; align-items: flex-end; }
     .input-bar textarea { flex: 1; padding: 10px; border: 1px solid #ced4da; border-radius: 10px; outline: none; font-size: 14px; resize: none; height: 50px; font-family: inherit; }
     .btn-send { background: #007aff; color: white; border: none; padding: 12px 18px; border-radius: 10px; font-weight: bold; cursor: pointer; height: 50px; }
@@ -60,7 +60,7 @@
 
 <div class="app-card">
 
-  <!-- Voice Player Elements -->
+  <!-- အသံထွက်စေရန် Audio Element ထည့်သွင်းထားသည် -->
   <audio id="remoteAudio" autoplay playsinline></audio>
 
   <!-- 1. Auth Screen -->
@@ -132,14 +132,14 @@
   const db = firebase.firestore();
 
   let currentUser = null;
-  let selectedUser = null;
+  let selectedUser = null; 
   let currentCallId = null;
 
-  // WebRTC Global State
+  // WebRTC & Audio Variables
   let peerConnection = null;
   let localStream = null;
   let remoteStream = null;
-  let activeCallUnsubscribe = null;
+  let callStateUnsubscribe = null;
 
   const rtcConfig = {
     iceServers: [
@@ -166,7 +166,8 @@
   }
 
   function confirmLogout() {
-    if (confirm("အကောင့်မှ ထွက်မှာ သေချာပါသလားဆရာ?")) {
+    const check = confirm("အကောင့်မှ ထွက်မှာ သေချာပါသလားဆရာ?");
+    if (check) {
       if (currentUser) {
         db.collection("users").doc(currentUser.uid).update({ online: false });
       }
@@ -209,7 +210,7 @@
       });
 
       if (count === 0) {
-        usersList.innerHTML = '<span style="font-size: 12px; color: #888;">အခြားသူများ မရှိသေးပါ</span>';
+        usersList.innerHTML = '<span style="font-size: 12px; color: #888;">အခြားသူများ မရှိသေးပါ (အကောင့်ဝင်သူ မရှိသေးပါ)</span>';
       }
     });
   }
@@ -224,6 +225,7 @@
 
   function loadPrivateMessages() {
     if (!selectedUser) return;
+
     const chatRoomId = getChatRoomId(currentUser.uid, selectedUser.uid);
 
     db.collection("chats").doc(chatRoomId).collection("messages")
@@ -250,18 +252,25 @@
   }
 
   function sendMessage() {
-    if (!selectedUser) return;
+    if (!selectedUser) {
+      alert("ကျေးဇူးပြု၍ စာပို့လိုသူကို အရင်ရွေးချယ်ပါဆရာ");
+      return;
+    }
+
     const input = document.getElementById('msgInput');
     const text = input.value.trim();
     if (!text) return;
 
     const chatRoomId = getChatRoomId(currentUser.uid, selectedUser.uid);
+
     db.collection("chats").doc(chatRoomId).collection("messages").add({
       text: text,
       senderUid: currentUser.uid,
       receiverUid: selectedUser.uid,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    }).then(() => input.value = '');
+    }).then(() => {
+      input.value = '';
+    });
   }
 
   function getChatRoomId(uid1, uid2) {
@@ -269,17 +278,17 @@
   }
 
   // -------------------------------------------------------------
-  // CALL SYSTEM & WEBRTC ENGINE
+  // WEBRTC VOICE AUDIO + REAL-TIME SYNC LOGIC
   // -------------------------------------------------------------
 
-  async function createPeerConnection(callDocRef) {
+  async function initAudioPeerConnection(callDocRef) {
     peerConnection = new RTCPeerConnection(rtcConfig);
 
     try {
       localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-    } catch (e) {
-      alert("မိုက်ခရိုဖုန်း ခွင့်ပြုချက် မရရှိပါ: " + e.message);
+    } catch (err) {
+      alert("မိုက်ခရိုဖုန်း အသုံးပြုခွင့် ပေးရန် လိုအပ်ပါသည်။");
       endCall();
       return null;
     }
@@ -289,24 +298,26 @@
       event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
       const remoteAudio = document.getElementById('remoteAudio');
       remoteAudio.srcObject = remoteStream;
-      remoteAudio.play().catch(err => console.log("Autoplay blocked setup:", err));
+      remoteAudio.play().catch(e => console.log("Audio Playback Error:", e));
     };
 
     return peerConnection;
   }
 
-  // 1. Start Call (Caller Side)
+  // 1. Call Start (Caller)
   async function startCall() {
     if (!selectedUser) return;
 
     currentCallId = getChatRoomId(currentUser.uid, selectedUser.uid);
     const callDocRef = db.collection("calls").doc(currentCallId);
 
-    const pc = await createPeerConnection(callDocRef);
+    const pc = await initAudioPeerConnection(callDocRef);
     if (!pc) return;
 
     const callerCandidates = callDocRef.collection('callerCandidates');
-    pc.onicecandidate = (e) => e.candidate && callerCandidates.add(e.candidate.toJSON());
+    pc.onicecandidate = event => {
+      if (event.candidate) callerCandidates.add(event.candidate.toJSON());
+    };
 
     const offerDescription = await pc.createOffer();
     await pc.setLocalDescription(offerDescription);
@@ -324,12 +335,11 @@
     document.getElementById('callStatusText').innerText = `${selectedUser.name} ထံ ဖုန်းခေါ်ဆိုနေပါသည်...`;
     document.getElementById('callActions').innerHTML = `<button class="btn-reject" onclick="endCall()">ဖုန်းချမည်</button>`;
 
-    // Global Sync Listener for Caller
-    listenCallDocument(currentCallId);
+    // Monitor for Call Acceptance, Disconnection & Rejection Sync
+    listenCallStatusSync(currentCallId);
 
-    // Listen to Answer SDP
-    callDocRef.onSnapshot(async (doc) => {
-      const data = doc.data();
+    callDocRef.onSnapshot(async snapshot => {
+      const data = snapshot.data();
       if (data && data.answer && !pc.currentRemoteDescription) {
         const answerDescription = new RTCSessionDescription(data.answer);
         await pc.setRemoteDescription(answerDescription);
@@ -337,7 +347,6 @@
       }
     });
 
-    // Listen to Receiver Candidates
     callDocRef.collection('receiverCandidates').onSnapshot(snapshot => {
       snapshot.docChanges().forEach(change => {
         if (change.type === 'added') {
@@ -347,7 +356,7 @@
     });
   }
 
-  // 2. Incoming Call Listener (Receiver Side)
+  // 2. Incoming Call Listener (Receiver)
   function listenIncomingCalls() {
     db.collection("calls").where("receiverUid", "==", currentUser.uid)
       .onSnapshot(snapshot => {
@@ -357,7 +366,7 @@
             if (data.status === "calling" && data.callerUid !== currentUser.uid) {
               currentCallId = change.doc.id;
               showIncomingCallUI(data.callerName);
-              listenCallDocument(currentCallId);
+              listenCallStatusSync(currentCallId);
             }
           }
         });
@@ -374,18 +383,20 @@
     `;
   }
 
-  // 3. Accept Call (Receiver Action)
+  // 3. Accept Call (Receiver)
   async function acceptCall() {
     if (!currentCallId) return;
     const callDocRef = db.collection("calls").doc(currentCallId);
     const callData = (await callDocRef.get()).data();
     if (!callData) return;
 
-    const pc = await createPeerConnection(callDocRef);
+    const pc = await initAudioPeerConnection(callDocRef);
     if (!pc) return;
 
     const receiverCandidates = callDocRef.collection('receiverCandidates');
-    pc.onicecandidate = (e) => e.candidate && receiverCandidates.add(e.candidate.toJSON());
+    pc.onicecandidate = event => {
+      if (event.candidate) receiverCandidates.add(event.candidate.toJSON());
+    };
 
     await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
     const answerDescription = await pc.createAnswer();
@@ -408,29 +419,27 @@
     document.getElementById('callActions').innerHTML = `<button class="btn-reject" onclick="endCall()">ဖုန်းချမည်</button>`;
   }
 
-  // Dynamic Listener for Realtime State Sync (Ended / Rejected)
-  function listenCallDocument(callId) {
-    if (activeCallUnsubscribe) activeCallUnsubscribe();
-
-    activeCallUnsubscribe = db.collection("calls").doc(callId).onSnapshot(doc => {
+  // Sync Status for both Caller and Receiver (Close call immediately if status is "ended")
+  function listenCallStatusSync(callId) {
+    if (callStateUnsubscribe) callStateUnsubscribe();
+    callStateUnsubscribe = db.collection("calls").doc(callId).onSnapshot(doc => {
       const data = doc.data();
-      if (!data || data.status === "ended" || data.status === "rejected") {
-        cleanupCallUI();
+      if (!data || data.status === "ended") {
+        hideCallUI();
       }
     });
   }
 
-  // 4. End / Decline Call Engine
+  // 4. End / Decline Call (Both Sides)
   async function endCall() {
     if (currentCallId) {
-      const callDocRef = db.collection("calls").doc(currentCallId);
-      await callDocRef.update({ status: "ended" }).catch(() => {});
+      await db.collection("calls").doc(currentCallId).update({ status: "ended" }).catch(() => {});
     }
-    cleanupCallUI();
+    hideCallUI();
   }
 
-  // Clean WebRTC Stream Memory & Elements
-  function cleanupCallUI() {
+  // Cleanup Resources & Streams
+  function hideCallUI() {
     if (peerConnection) {
       peerConnection.close();
       peerConnection = null;
@@ -439,9 +448,9 @@
       localStream.getTracks().forEach(track => track.stop());
       localStream = null;
     }
-    if (activeCallUnsubscribe) {
-      activeCallUnsubscribe();
-      activeCallUnsubscribe = null;
+    if (callStateUnsubscribe) {
+      callStateUnsubscribe();
+      callStateUnsubscribe = null;
     }
 
     currentCallId = null;
@@ -451,5 +460,5 @@
 </script>
 
 </body>
-  </html>
+                                                                                 </html>
   
