@@ -17,15 +17,43 @@
     .app-card { background: #ffffff; width: 100%; max-width: 420px; height: 92vh; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; position: relative; }
     .hidden { display: none !important; }
 
-    /* Floating In-App Banner Notification */
-    .chat-notification-banner {
-      position: absolute; top: 10px; left: 5%; width: 90%; background: #007aff; color: white;
-      padding: 12px 16px; border-radius: 12px; box-shadow: 0 6px 16px rgba(0,0,0,0.25);
-      z-index: 300; display: flex; justify-content: space-between; align-items: center;
-      cursor: pointer; animation: slideDown 0.3s ease-out;
+    /* Smart Top Floating Notification Banner */
+    .top-notification-banner {
+      position: absolute; top: 12px; left: 4%; width: 92%; background: rgba(20, 20, 20, 0.92);
+      color: #ffffff; padding: 12px 16px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      z-index: 400; display: flex; align-items: center; justify-content: space-between;
+      backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15);
+      animation: slideInDown 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      cursor: pointer;
     }
-    @keyframes slideDown { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    .notif-text { font-size: 13px; max-width: 80%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .top-notification-banner.slide-out {
+      animation: slideOutUp 0.4s ease-in forwards;
+    }
+
+    @keyframes slideInDown {
+      from { transform: translateY(-80px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes slideOutUp {
+      from { transform: translateY(0); opacity: 1; }
+      to { transform: translateY(-80px); opacity: 0; }
+    }
+
+    .notif-body { display: flex; flex-direction: column; width: 78%; overflow: hidden; }
+    .notif-title { font-size: 13px; font-weight: bold; color: #34c759; margin-bottom: 2px; display: flex; align-items: center; gap: 6px; }
+    
+    /* စာအသီးသီး ရှည်ပါက ဘေးသို့ ရွှေ့သွားမည့် Animation */
+    .notif-ticker { white-space: nowrap; font-size: 13px; color: #eee; overflow: hidden; text-overflow: ellipsis; }
+    
+    /* Screen Edge Flashlight Animation (စာဝင်/ဖုန်းဝင် မီးလင်းသည့် Effect) */
+    .flash-strobe {
+      animation: edgeFlash 0.6s 3;
+    }
+    @keyframes edgeFlash {
+      0% { box-shadow: inset 0 0 0px #007aff; }
+      50% { box-shadow: inset 0 0 35px #007aff, 0 0 25px #007aff; }
+      100% { box-shadow: inset 0 0 0px #007aff; }
+    }
 
     /* Auth Screen */
     .auth-box { padding: 30px 20px; display: flex; flex-direction: column; gap: 15px; justify-content: center; height: 100%; text-align: center; }
@@ -94,17 +122,21 @@
 </head>
 <body>
 
-<div class="app-card">
+<div class="app-card" id="appCard">
 
   <!-- Audio Elements -->
   <audio id="remoteAudio" autoplay playsinline></audio>
 
-  <!-- In-App Notification Banner Container -->
-  <div id="notifBanner" class="chat-notification-banner hidden" onclick="openNotifChat()">
-    <div class="notif-text">
-      <strong id="notifSender">...</strong>: <span id="notifMsg">...</span>
+  <!-- Top Floating Notification Banner -->
+  <div id="topBanner" class="top-notification-banner hidden" onclick="handleBannerClick()">
+    <div class="notif-body">
+      <div class="notif-title">
+        <span id="notifIcon">💬</span>
+        <span id="notifSender">...</span>
+      </div>
+      <div class="notif-ticker" id="notifText">...</div>
     </div>
-    <span style="font-size: 11px; opacity: 0.8;">နှိပ်ပါ</span>
+    <span style="font-size: 11px; background: rgba(255,255,255,0.2); padding: 4px 8px; border-radius: 10px;">ဖွင့်ရန်</span>
   </div>
 
   <!-- 1. Auth Screen -->
@@ -211,6 +243,7 @@
   let currentCallId = null;
   let activeChatUnsubscribe = null;
   let notifTargetUser = null;
+  let bannerTimeout = null;
 
   // WebRTC & Controls
   let peerConnection = null;
@@ -259,6 +292,7 @@
   }
 
   function onLoginSuccess(user) {
+    document.getElementById('authSection').classList.hidden = true;
     document.getElementById('authSection').classList.add('hidden');
     document.getElementById('appSection').classList.remove('hidden');
     document.getElementById('userNameDisplay').innerText = user.displayName || user.email;
@@ -337,7 +371,49 @@
       });
   }
 
-  /* In-App Notification System */
+  // -------------------------------------------------------------
+  // DYNAMIC TOP BANNER NOTIFICATIONS & FLASHING EFFECT
+  // -------------------------------------------------------------
+  function triggerScreenFlash() {
+    const appCard = document.getElementById('appCard');
+    appCard.classList.remove('flash-strobe');
+    void appCard.offsetWidth; // Force Reflow Animation
+    appCard.classList.add('flash-strobe');
+  }
+
+  function showTopBanner(icon, sender, text, userObject) {
+    notifTargetUser = userObject;
+    triggerScreenFlash();
+
+    const banner = document.getElementById('topBanner');
+    document.getElementById('notifIcon').innerText = icon;
+    document.getElementById('notifSender').innerText = sender;
+    document.getElementById('notifText').innerText = text;
+
+    banner.classList.remove('hidden', 'slide-out');
+    
+    clearTimeout(bannerTimeout);
+    bannerTimeout = setTimeout(() => {
+      dismissBanner();
+    }, 5000); // ၅ စက္ကန့်အကြာတွင် ပြန်ပျောက်မည်
+  }
+
+  function dismissBanner() {
+    const banner = document.getElementById('topBanner');
+    banner.classList.add('slide-out');
+    setTimeout(() => {
+      banner.classList.add('hidden');
+      banner.classList.remove('slide-out');
+    }, 400);
+  }
+
+  function handleBannerClick() {
+    dismissBanner();
+    if (notifTargetUser) {
+      selectUserForChat(notifTargetUser);
+    }
+  }
+
   function listenGlobalIncomingMessages() {
     db.collectionGroup("messages")
       .where("receiverUid", "==", currentUser.uid)
@@ -350,29 +426,14 @@
             if (!selectedUser || selectedUser.uid !== msgData.senderUid) {
               db.collection("users").doc(msgData.senderUid).get().then(doc => {
                 if (doc.exists) {
-                  showInAppNotification(doc.data(), msgData.text);
+                  const sender = doc.data();
+                  showTopBanner("💬", sender.name, msgData.text, sender);
                 }
               });
             }
           }
         });
       });
-  }
-
-  function showInAppNotification(sender, text) {
-    notifTargetUser = sender;
-    document.getElementById('notifSender').innerText = sender.name;
-    document.getElementById('notifMsg').innerText = text;
-    const banner = document.getElementById('notifBanner');
-    banner.classList.remove('hidden');
-    setTimeout(() => { banner.classList.add('hidden'); }, 5000);
-  }
-
-  function openNotifChat() {
-    if (notifTargetUser) {
-      selectUserForChat(notifTargetUser);
-      document.getElementById('notifBanner').classList.add('hidden');
-    }
   }
 
   function sendMessage() {
@@ -397,7 +458,7 @@
   }
 
   // -------------------------------------------------------------
-  // LOUDER RINGTONE ENGINE (အသံအတိုးအကျယ် ၃ ဆမြှင့်ထားသည်)
+  // LOUDER RINGTONE ENGINE
   // -------------------------------------------------------------
   function playTone(freq1, freq2, duration) {
     try {
@@ -413,7 +474,6 @@
       osc1.frequency.value = freq1;
       osc2.frequency.value = freq2;
 
-      // Gain 0.35 ထိမြှင့်၍ အသံကျယ်လောင်အောင် ပြုလုပ်ထားပါသည်
       gainNode.gain.setValueAtTime(0.35, audioCtx.currentTime);
 
       osc1.connect(gainNode); osc2.connect(gainNode); gainNode.connect(audioCtx.destination);
@@ -439,8 +499,9 @@
     if (ringtoneInterval) { clearInterval(ringtoneInterval); ringtoneInterval = null; }
     document.getElementById('callOverlay').classList.remove('flashing');
   }
+
   // -------------------------------------------------------------
-  // CLEAN UI OVERLAY LOGIC (ခလုတ်များ ပုန်းလျှိုး/ဖော်ပြခြင်း)
+  // CLEAN UI OVERLAY LOGIC
   // -------------------------------------------------------------
   function showCallUI() {
     document.getElementById('topUiLayer').classList.remove('autohide');
@@ -467,7 +528,7 @@
   }
 
   // -------------------------------------------------------------
-  // WEBRTC CALL ENGINE (AUDIO & VIDEO + FLASH LIGHT)
+  // WEBRTC CALL ENGINE
   // -------------------------------------------------------------
   async function initPeerConnection(callDocRef, isVideo = false) {
     peerConnection = new RTCPeerConnection(rtcConfig);
@@ -574,6 +635,13 @@
               currentCallId = change.doc.id;
               currentCallType = data.callType || 'audio';
               isCallConnected = false;
+              
+              // Top Floating Banner ဖြင့်လည်း သတိပေးမည်
+              db.collection("users").doc(data.callerUid).get().then(doc => {
+                const caller = doc.exists ? doc.data() : { name: data.callerName, uid: data.callerUid };
+                showTopBanner("📞", caller.name, `${currentCallType === 'video' ? 'Video' : 'Audio'} ဖုန်းခေါ်ဆိုနေသည်...`, caller);
+              });
+
               showIncomingCallUI(data.callerName, currentCallType);
               listenCallStatusSync(currentCallId);
             }
@@ -598,6 +666,7 @@
 
   async function acceptCall() {
     stopRingtone();
+    dismissBanner();
     if (!currentCallId) return;
 
     const callDocRef = db.collection("calls").doc(currentCallId);
@@ -642,7 +711,6 @@
       isMicMuted = !isMicMuted;
       track.enabled = !isMicMuted;
       const btn = document.getElementById('toggleMicBtn');
-      btn.innerText = isMicMuted ? "🎙️" : "🎙️";
       btn.classList.toggle('off', isMicMuted);
     }
   }
@@ -652,7 +720,6 @@
     isAudioMuted = !isAudioMuted;
     remoteAudio.muted = isAudioMuted;
     const btn = document.getElementById('toggleAudioBtn');
-    btn.innerText = isAudioMuted ? "🔇" : "🔊";
     btn.classList.toggle('off', isAudioMuted);
   }
 
@@ -663,7 +730,6 @@
       isCamOff = !isCamOff;
       videoTrack.enabled = !isCamOff;
       const btn = document.getElementById('toggleCamBtn');
-      btn.innerText = isCamOff ? "📹" : "📹";
       btn.classList.toggle('off', isCamOff);
     }
   }
@@ -697,6 +763,7 @@
 
   async function endCall() {
     stopRingtone();
+    dismissBanner();
     if (currentCallId) {
       await db.collection("calls").doc(currentCallId).update({ status: "ended" }).catch(() => {});
     }
@@ -735,3 +802,4 @@
 
 </body>
 </html>
+ 
