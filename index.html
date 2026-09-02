@@ -3,16 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Phone Call & Private Chat App</title>
+  <title>Video Call & Chat App</title>
 
   <!-- Firebase Web SDK v10.8.0 (Compat Mode) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
-
-  <!-- SendBird Calls / Chat SDK (If integrated) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/sendbird/3.1.2/SendBird.min.js"></script>
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -21,47 +17,29 @@
     .app-card { background: #ffffff; width: 100%; max-width: 420px; height: 92vh; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; position: relative; }
     .hidden { display: none !important; }
 
-    /* Flashlight Screen Effect */
-    .screen-flash-active {
-      animation: flashStrobe 0.5s infinite alternate;
-    }
-    @keyframes flashStrobe {
-      0% { box-shadow: inset 0 0 0px #ff0000; background-color: rgba(255,255,255,1); }
-      100% { box-shadow: inset 0 0 50px #007aff; background-color: rgba(0,122,255,0.2); }
-    }
-
-    /* Floating Notification Banner */
-    .top-notification-banner {
-      position: absolute; top: 12px; left: 4%; width: 92%; background: rgba(20, 20, 20, 0.95);
-      color: #ffffff; padding: 12px 16px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-      z-index: 400; display: flex; align-items: center; justify-content: space-between;
-      backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15);
-      animation: slideInDown 0.4s ease-out; cursor: pointer;
-    }
-
-    @keyframes slideInDown {
-      from { transform: translateY(-80px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-
-    .notif-body { display: flex; flex-direction: column; width: 78%; overflow: hidden; }
-    .notif-title { font-size: 13px; font-weight: bold; color: #34c759; margin-bottom: 2px; display: flex; align-items: center; gap: 6px; }
-    .notif-ticker { white-space: nowrap; font-size: 13px; color: #eee; overflow: hidden; text-overflow: ellipsis; }
-
     /* Auth Styling */
     .auth-box { padding: 25px 20px; display: flex; flex-direction: column; gap: 12px; justify-content: center; height: 100%; text-align: center; overflow-y: auto; }
     .input-auth { padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; width: 100%; }
-    .btn-auth { background: #007aff; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; margin-top: 5px; }
+    .btn-auth { background: #007aff; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; }
     .btn-google { background: #4285f4; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; }
 
     /* App Layout */
     .app-header { background: #007aff; color: white; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
-    .header-user { font-size: 13px; font-weight: 600; }
-    .btn-logout { background: rgba(255, 59, 48, 0.9); color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; }
+    .header-user { font-size: 12px; font-weight: 600; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .header-actions { display: flex; gap: 4px; }
+    .btn-action { color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; }
+    .btn-voice { background: #28a745; }
+    .btn-video { background: #5856d6; }
+    .btn-logout { background: #ff3b30; }
 
-    .users-bar { background: #f8f9fa; border-bottom: 1px solid #e9ecef; padding: 8px 10px; }
-    .user-list { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 3px; }
-    .user-chip { background: #ffffff; border: 1px solid #ced4da; padding: 4px 10px; border-radius: 16px; font-size: 12px; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
+    /* User Connect Bar */
+    .search-bar { background: #f8f9fa; border-bottom: 1px solid #e9ecef; padding: 8px; display: flex; gap: 6px; }
+    .search-input { flex: 1; padding: 6px 10px; border: 1px solid #ced4da; border-radius: 12px; font-size: 12px; }
+    .btn-search { background: #007aff; color: white; border: none; padding: 0 12px; border-radius: 12px; font-size: 12px; cursor: pointer; }
+
+    .users-bar { background: #ffffff; border-bottom: 1px solid #e9ecef; padding: 6px 8px; }
+    .user-list { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+    .user-chip { background: #e9ecef; border: 1px solid #ced4da; padding: 4px 10px; border-radius: 16px; font-size: 12px; cursor: pointer; white-space: nowrap; }
     .user-chip.active { background: #007aff; color: white; border-color: #007aff; }
 
     .chat-box { flex: 1; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #fafafa; }
@@ -73,68 +51,59 @@
     .input-bar textarea { flex: 1; padding: 8px; border: 1px solid #ced4da; border-radius: 8px; font-size: 13px; resize: none; height: 42px; }
     .btn-send { background: #007aff; color: white; border: none; padding: 0 14px; border-radius: 8px; font-weight: bold; cursor: pointer; }
 
-    /* Call Overlay */
-    .call-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); color: white; display: flex; flex-direction: column; justify-content: space-between; align-items: center; z-index: 100; text-align: center; padding: 30px 15px; }
-    .btn-accept { background: #28a745; color: white; border: none; padding: 12px 28px; border-radius: 25px; font-weight: bold; cursor: pointer; }
-    .btn-reject { background: #dc3545; color: white; border: none; padding: 12px 28px; border-radius: 25px; font-weight: bold; cursor: pointer; }
+    /* Video & Voice Call Screen Overlay */
+    .call-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #1c1c1e; color: white; display: flex; flex-direction: column; justify-content: space-between; align-items: center; z-index: 500; text-align: center; padding: 20px 10px; }
+    .video-container { position: relative; width: 100%; height: 75%; background: #000; border-radius: 12px; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+    #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
+    #localVideo { position: absolute; top: 10px; right: 10px; width: 90px; height: 130px; object-fit: cover; border-radius: 8px; border: 2px solid #fff; background: #333; }
+    .call-controls { display: flex; gap: 15px; margin-bottom: 20px; }
+    .btn-call-action { padding: 12px 24px; border-radius: 25px; border: none; font-weight: bold; color: white; cursor: pointer; font-size: 14px; }
+    .btn-accept-call { background: #34c759; }
+    .btn-end-call { background: #ff3b30; }
   </style>
 </head>
 <body>
 
 <div class="app-card" id="appCard">
-
-  <audio id="remoteAudio" autoplay playsinline></audio>
   <div id="recaptcha-container"></div>
-
-  <!-- Banner Notification -->
-  <div id="topBanner" class="top-notification-banner hidden" onclick="handleBannerClick()">
-    <div class="notif-body">
-      <div class="notif-title"><span id="notifIcon">💬</span> <span id="notifSender">...</span></div>
-      <div class="notif-ticker" id="notifText">...</div>
-    </div>
-    <span style="font-size: 11px; background: rgba(255,255,255,0.2); padding: 4px 8px; border-radius: 10px;">ဖွင့်ရန်</span>
-  </div>
 
   <!-- 1. Auth Section -->
   <div id="authSection" class="auth-box">
     <h2>အကောင့်ဝင်ရောက်ရန်</h2>
-    
-    <!-- Email Login -->
     <input type="email" id="emailInput" class="input-auth" placeholder="အီးမေးလ် ထည့်ပါ">
     <input type="password" id="passInput" class="input-auth" placeholder="စကားဝှက် ထည့်ပါ">
     <button class="btn-auth" onclick="loginWithEmail()">Email ဖြင့် ဝင်မည် / အကောင့်ဖွင့်မည်</button>
-
-    <hr style="margin: 10px 0; border: 0.5px solid #eee;">
-
-    <!-- Phone Login -->
-    <input type="text" id="phoneInput" class="input-auth" placeholder="+959xxxxxxxxx">
-    <button class="btn-auth" style="background: #34c759;" onclick="sendOTP()">ဖုန်းနံပါတ်သို့ OTP ပို့မည်</button>
-    
-    <div id="otpSection" class="hidden" style="margin-top: 5px;">
-      <input type="text" id="otpInput" class="input-auth" placeholder="OTP ၆ လုံး ထည့်ပါ">
-      <button class="btn-auth" style="background: #5856d6;" onclick="verifyOTP()">OTP အတည်ပြုမည်</button>
-    </div>
-
-    <hr style="margin: 10px 0; border: 0.5px solid #eee;">
-
+    <hr style="margin: 5px 0; border: 0.5px solid #eee;">
     <button class="btn-google" onclick="loginWithGoogle()">Google Account ဖြင့် ဝင်မည်</button>
   </div>
 
   <!-- 2. Main App Section -->
   <div id="appSection" class="hidden" style="display: flex; flex-direction: column; height: 100%;">
     <div class="app-header">
-      <div class="header-user">မိမိ: <span id="userNameDisplay">...</span></div>
-      <div>
-        <button id="callBtn" class="btn-logout" style="background:#28a745;" onclick="startCall('audio')">📞 Call</button>
-        <button class="btn-logout" onclick="confirmLogout()">ထွက်မည်</button>
+      <div class="header-user" id="userNameDisplay">...</div>
+      <div class="header-actions">
+        <button class="btn-action btn-voice" onclick="initiateCall('audio')">📞 Voice</button>
+        <button class="btn-action btn-video" onclick="initiateCall('video')">📹 Video</button>
+        <button class="btn-action btn-logout" onclick="confirmLogout()">ထွက်</button>
       </div>
     </div>
 
+    <!-- User Search / Connect Bar -->
+    <div class="search-bar">
+      <input type="email" id="targetUserEmail" class="search-input" placeholder="ပြောဆိုလိုသူ၏ Email ရိုက်ထည့်ပါ...">
+      <button class="btn-search" onclick="connectUserByEmail()">ချိတ်ဆက်မည်</button>
+    </div>
+
     <div class="users-bar">
+      <div style="font-size: 11px; color: #666; margin-bottom: 3px;">အွန်လိုင်းရှိသူများ / စကားပြောဖော်များ:</div>
       <div class="user-list" id="usersList"></div>
     </div>
 
-    <div class="chat-box" id="chatBox"></div>
+    <div class="chat-box" id="chatBox">
+      <div style="text-align: center; color: #8e8e93; font-size: 12px; margin-top: 20px;" id="chatPlaceholder">
+        စာပို့ရန် သို့မဟုတ် ဖုန်းခေါ်ဆိုရန် အထက်တွင် အသုံးပြုသူ ရွေးချယ်ပါ သို့မဟုတ် Email ရိုက်ထည့်ပါ။
+      </div>
+    </div>
 
     <div class="input-bar">
       <textarea id="msgInput" placeholder="စာရိုက်ပါ..."></textarea>
@@ -142,136 +111,96 @@
     </div>
   </div>
 
-  <!-- 3. Call Overlay -->
+  <!-- 3. Video / Audio Call Overlay -->
   <div id="callOverlay" class="call-overlay hidden">
-    <h3 id="callStatusText">ဖုန်းခေါ်ဆိုနေပါသည်...</h3>
-    <p id="callerNameText"></p>
-    <div id="callActions">
-      <button class="btn-reject" onclick="endCall()">ဖုန်းချမည်</button>
+    <h4 id="callStatusText">ဖုန်းခေါ်ဆိုနေပါသည်...</h4>
+    
+    <div class="video-container" id="videoContainer">
+      <video id="remoteVideo" autoplay playsinline></video>
+      <video id="localVideo" autoplay playsinline muted></video>
+    </div>
+
+    <div class="call-controls" id="callControls">
+      <button class="btn-call-action btn-end-call" onclick="hangUpCall()">ဖုန်းချမည်</button>
     </div>
   </div>
 
 </div>
 
 <script>
-  // ထည့်သွင်းထားသော တရားဝင် API Key များ
-  const SENDBIRD_APP_ID = "VowcxoA6jriMLJ8YvcNI87nCu6gV2inBw34nTIuccnw";
-  
+  // Firebase App Config
   const firebaseConfig = {
     apiKey: "AIzaSyCxM61dhkI992k0SZZQNRimqEIp5DM4PaE",
     authDomain: "phone-call-bcb5d.firebaseapp.com",
     projectId: "phone-call-bcb5d",
     storageBucket: "phone-call-bcb5d.firebasestorage.app",
     messagingSenderId: "479656547247",
-    appId: "1:479656547247:web:d6ae8a8903282e3856955a",
-    measurementId: "G-TS8HYPV8VE"
+    appId: "1:479656547247:web:d6ae8a8903282e3856955a"
   };
 
   if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   const db = firebase.firestore();
 
-  // SendBird Init (If SendBird SDK is loaded)
-  let sb = null;
-  if (typeof SendBird !== 'undefined') {
-    sb = new SendBird({ appId: SENDBIRD_APP_ID });
-  }
-
   let currentUser = null;
   let selectedUser = null;
-  let confirmationResultObj = null;
-  let audioCtx = null;
 
-  window.onload = () => {
-    window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-      'size': 'invisible'
-    });
+  // WebRTC Variables
+  let localStream = null;
+  let remoteStream = null;
+  let peerConnection = null;
+  let currentCallDocId = null;
+
+  const rtcServers = {
+    iceServers: [{ urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }]
   };
 
+  // Auth Observer
   auth.onAuthStateChanged(user => {
     if (user) {
       currentUser = user;
       document.getElementById('authSection').classList.add('hidden');
       document.getElementById('appSection').classList.remove('hidden');
-      document.getElementById('userNameDisplay').innerText = user.displayName || user.email || user.phoneNumber;
+      document.getElementById('userNameDisplay').innerText = user.email || user.displayName;
 
-      // Connect to SendBird User Session
-      if (sb) {
-        sb.connect(user.uid, (sbUser, err) => {
-          if (!err) {
-            sb.updateCurrentUserInfo(user.displayName || user.email || user.phoneNumber, null, null);
-          }
-        });
-      }
-
+      // Save user session to Firestore
       db.collection("users").doc(user.uid).set({
-        name: user.displayName || user.email || user.phoneNumber,
+        name: user.displayName || user.email.split('@')[0],
+        email: user.email,
         uid: user.uid,
         online: true
       }, { merge: true });
 
-      listenUsers();
+      listenUserList();
       listenIncomingCalls();
-      listenMessages();
     } else {
       document.getElementById('authSection').classList.remove('hidden');
       document.getElementById('appSection').classList.add('hidden');
     }
   });
 
-  // Auth Functions
-  function loginWithGoogle() {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).catch(e => alert(e.message));
-  }
-
+  // Login Functions
   function loginWithEmail() {
-    const email = document.getElementById('emailInput').value;
-    const pass = document.getElementById('passInput').value;
+    const email = document.getElementById('emailInput').value.trim();
+    const pass = document.getElementById('passInput').value.trim();
+    if(!email || !pass) return alert("Email နှင့် Password ဖြည့်ပါ");
     auth.signInWithEmailAndPassword(email, pass).catch(() => {
       auth.createUserWithEmailAndPassword(email, pass).catch(e => alert(e.message));
     });
   }
 
-  function sendOTP() {
-    const phoneNumber = document.getElementById('phoneInput').value;
-    const appVerifier = window.recaptchaVerifier;
-    auth.signInWithPhoneNumber(phoneNumber, appVerifier)
-      .then(result => {
-        confirmationResultObj = result;
-        document.getElementById('otpSection').classList.remove('hidden');
-        alert("OTP ပို့ပြီးပါပြီ။");
-      }).catch(e => alert(e.message));
-  }
-
-  function verifyOTP() {
-    const code = document.getElementById('otpInput').value;
-    confirmationResultObj.confirm(code).catch(e => alert("OTP မမှန်ပါ: " + e.message));
+  function loginWithGoogle() {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(e => alert(e.message));
   }
 
   function confirmLogout() {
     if (currentUser) db.collection("users").doc(currentUser.uid).update({ online: false });
-    if (sb) sb.disconnect();
     auth.signOut();
   }
 
-  // Strobe Notification & Beep Sound
-  function triggerStrobeNotification() {
-    const appCard = document.getElementById('appCard');
-    appCard.classList.add('screen-flash-active');
-    setTimeout(() => appCard.classList.remove('screen-flash-active'), 3000);
-    
-    try {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      osc.connect(audioCtx.destination);
-      osc.frequency.value = 800;
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.3);
-    } catch(e) {}
-  }
-
-  function listenUsers() {
+  // Active Users Listener
+  function listenUserList() {
     db.collection("users").onSnapshot(snap => {
       const list = document.getElementById('usersList');
       list.innerHTML = '';
@@ -280,14 +209,38 @@
         if (u.uid !== currentUser.uid) {
           const div = document.createElement('div');
           div.className = `user-chip ${selectedUser && selectedUser.uid === u.uid ? 'active' : ''}`;
-          div.innerText = u.name;
-          div.onclick = () => { selectedUser = u; listenMessages(); };
+          div.innerText = u.email || u.name;
+          div.onclick = () => selectTargetUser(u);
           list.appendChild(div);
         }
       });
     });
   }
 
+  // Connect to target Email directly
+  function connectUserByEmail() {
+    const email = document.getElementById('targetUserEmail').value.trim();
+    if (!email) return alert("Email ရိုက်ထည့်ပါ");
+    
+    db.collection("users").where("email", "==", email).get().then(snap => {
+      if (snap.empty) {
+        // Create dynamic target
+        const target = { uid: email.replace(/[^a-zA-Z0-9]/g, "_"), email: email, name: email };
+        selectTargetUser(target);
+      } else {
+        snap.forEach(doc => selectTargetUser(doc.data()));
+      }
+    });
+  }
+
+  function selectTargetUser(user) {
+    selectedUser = user;
+    document.getElementById('chatPlaceholder').classList.add('hidden');
+    listenMessages();
+    listenUserList();
+  }
+
+  // Messaging System
   function listenMessages() {
     if (!selectedUser) return;
     const roomId = currentUser.uid < selectedUser.uid ? `${currentUser.uid}_${selectedUser.uid}` : `${selectedUser.uid}_${currentUser.uid}`;
@@ -308,10 +261,10 @@
   }
 
   function sendMessage() {
-    if (!selectedUser) return alert("လူရွေးပါ");
+    if (!selectedUser) return alert("စာပို့လိုသည့် လူကို အရင်ရွေးချယ်ပါ သို့မဟုတ် Email ဖြင့် ချိတ်ဆက်ပါ");
     const input = document.getElementById('msgInput');
     if (!input.value.trim()) return;
-    
+
     const roomId = currentUser.uid < selectedUser.uid ? `${currentUser.uid}_${selectedUser.uid}` : `${selectedUser.uid}_${currentUser.uid}`;
     db.collection("chats").doc(roomId).collection("messages").add({
       text: input.value,
@@ -320,48 +273,145 @@
     }).then(() => input.value = '');
   }
 
+  // --- WebRTC Video & Audio Calling Engine ---
+  async function initiateCall(type) {
+    if (!selectedUser) return alert("ဖုန်းခေါ်ဆိုရန် အသုံးပြုသူ ရွေးချယ်ပါ");
+
+    const callDoc = db.collection("calls").doc();
+    currentCallDocId = callDoc.id;
+
+    document.getElementById('callOverlay').classList.remove('hidden');
+    document.getElementById('callStatusText').innerText = `${selectedUser.email} သို့ ခေါ်ဆိုနေပါသည်...`;
+
+    localStream = await navigator.mediaDevices.getUserMedia({ video: type === 'video', audio: true });
+    remoteStream = new MediaStream();
+
+    document.getElementById('localVideo').srcObject = localStream;
+    document.getElementById('remoteVideo').srcObject = remoteStream;
+
+    peerConnection = new RTCPeerConnection(rtcServers);
+    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+    peerConnection.ontrack = event => {
+      event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
+    };
+
+    const offerCandidates = callDoc.collection("offerCandidates");
+    peerConnection.onicecandidate = event => {
+      if (event.candidate) offerCandidates.add(event.candidate.toJSON());
+    };
+
+    const offerDescription = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offerDescription);
+
+    await callDoc.set({
+      offer: { type: offerDescription.type, sdp: offerDescription.sdp },
+      callerEmail: currentUser.email,
+      receiverUid: selectedUser.uid,
+      callType: type,
+      status: "calling"
+    });
+
+    callDoc.onSnapshot(snapshot => {
+      const data = snapshot.data();
+      if (peerConnection && !peerConnection.currentRemoteDescription && data && data.answer) {
+        const answerDescription = new RTCSessionDescription(data.answer);
+        peerConnection.setRemoteDescription(answerDescription);
+        document.getElementById('callStatusText').innerText = "ချိတ်ဆက်လိုက်ပါပြီ";
+      }
+      if (data && data.status === "ended") hangUpCall(false);
+    });
+
+    callDoc.collection("answerCandidates").onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(change => {
+        if (change.type === "added") {
+          peerConnection.addIceCandidate(new RTCIceCandidate(change.doc.data()));
+        }
+      });
+    });
+  }
+
   function listenIncomingCalls() {
     db.collection("calls").where("receiverUid", "==", currentUser.uid).where("status", "==", "calling")
-      .onSnapshot(snap => {
-        snap.forEach(doc => {
-          const data = doc.data();
-          triggerStrobeNotification();
-          document.getElementById('callOverlay').classList.remove('hidden');
-          document.getElementById('callStatusText').innerText = "ဖုန်းဝင်လာပါသည်!";
-          document.getElementById('callerNameText').innerText = data.callerName;
-          document.getElementById('callActions').innerHTML = `
-            <button class="btn-accept" onclick="acceptCall('${doc.id}')">ကိုင်မည်</button>
-            <button class="btn-reject" onclick="endCall('${doc.id}')">ငြင်းမည်</button>
-          `;
+      .onSnapshot(snapshot => {
+        snapshot.docChanges().forEach(async change => {
+          if (change.type === "added") {
+            const data = change.doc.data();
+            currentCallDocId = change.doc.id;
+
+            document.getElementById('callOverlay').classList.remove('hidden');
+            document.getElementById('callStatusText').innerText = `${data.callerEmail} ထံမှ ${data.callType === 'video' ? 'Video' : 'Voice'} Call ဝင်လာပါသည်...`;
+
+            document.getElementById('callControls').innerHTML = `
+              <button class="btn-call-action btn-accept-call" onclick="answerCall('${data.callType}')">ကိုင်မည်</button>
+              <button class="btn-call-action btn-end-call" onclick="hangUpCall()">ငြင်းမည်</button>
+            `;
+          }
         });
       });
   }
 
-  async function startCall() {
-    if (!selectedUser) return alert("ဖုန်းခေါ်ဆိုရန် လူရွေးပါ");
-    const callId = currentUser.uid < selectedUser.uid ? `${currentUser.uid}_${selectedUser.uid}` : `${selectedUser.uid}_${currentUser.uid}`;
+  async function answerCall(type) {
+    const callDoc = db.collection("calls").doc(currentCallDocId);
     
-    await db.collection("calls").doc(callId).set({
-      callerUid: currentUser.uid,
-      callerName: currentUser.displayName || currentUser.email,
-      receiverUid: selectedUser.uid,
-      status: "calling"
+    localStream = await navigator.mediaDevices.getUserMedia({ video: type === 'video', audio: true });
+    remoteStream = new MediaStream();
+
+    document.getElementById('localVideo').srcObject = localStream;
+    document.getElementById('remoteVideo').srcObject = remoteStream;
+
+    peerConnection = new RTCPeerConnection(rtcServers);
+    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+    peerConnection.ontrack = event => {
+      event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
+    };
+
+    const answerCandidates = callDoc.collection("answerCandidates");
+    peerConnection.onicecandidate = event => {
+      if (event.candidate) answerCandidates.add(event.candidate.toJSON());
+    };
+
+    const callData = (await callDoc.get()).data();
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(callData.offer));
+
+    const answerDescription = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answerDescription);
+
+    await callDoc.update({
+      answer: { type: answerDescription.type, sdp: answerDescription.sdp },
+      status: "connected"
     });
 
-    document.getElementById('callOverlay').classList.remove('hidden');
-    document.getElementById('callStatusText').innerText = "ဖုန်းခေါ်ဆိုနေပါသည်...";
+    callDoc.collection("offerCandidates").onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(change => {
+        if (change.type === "added") {
+          peerConnection.addIceCandidate(new RTCIceCandidate(change.doc.data()));
+        }
+      });
+    });
+
+    document.getElementById('callControls').innerHTML = `
+      <button class="btn-call-action btn-end-call" onclick="hangUpCall()">ဖုန်းချမည်</button>
+    `;
   }
 
-  function acceptCall(callId) {
-    db.collection("calls").doc(callId).update({ status: "connected" });
-    document.getElementById('callStatusText').innerText = "စကားပြောနေပါသည်...";
-  }
+  function hangUpCall(notifyRemote = true) {
+    if (notifyRemote && currentCallDocId) {
+      db.collection("calls").doc(currentCallDocId).update({ status: "ended" });
+    }
 
-  function endCall(callId) {
-    if(callId) db.collection("calls").doc(callId).update({ status: "ended" });
+    if (localStream) localStream.getTracks().forEach(track => track.stop());
+    if (peerConnection) peerConnection.close();
+
+    localStream = null;
+    remoteStream = null;
+    peerConnection = null;
+    currentCallDocId = null;
+
     document.getElementById('callOverlay').classList.add('hidden');
   }
 </script>
 </body>
-                                                                          </html>
-                                                                          
+  </html>
+  
