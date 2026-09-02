@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Advanced Video Call & Chat App</title>
+  <title>Complete WebRTC Call & Chat App</title>
 
-  <!-- Firebase Web SDK v10.8.0 (Compat Mode) -->
+  <!-- Firebase Web SDK (Compat Engine) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -17,30 +17,30 @@
     .app-card { background: #1e1e1e; width: 100%; max-width: 420px; height: 92vh; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: flex; flex-direction: column; overflow: hidden; position: relative; border: 1px solid #333; }
     .hidden { display: none !important; }
 
+    /* Top Banner Notification (Message System) */
+    .top-notification { position: absolute; top: 10px; left: 5%; right: 5%; background: rgba(30, 30, 30, 0.95); border: 1px solid #0a84ff; border-radius: 12px; padding: 12px; z-index: 2000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 4px; transform: translateY(-120%); transition: transform 0.3s ease; }
+    .top-notification.show { transform: translateY(0); }
+    .notif-title { font-size: 11px; color: #0a84ff; font-weight: bold; }
+    .notif-body { font-size: 13px; color: #fff; }
+
     /* Auth Styling */
     .auth-box { padding: 30px 20px; display: flex; flex-direction: column; gap: 15px; justify-content: center; height: 100%; text-align: center; }
     .input-dark { padding: 14px; background: #2a2a2a; border: 1px solid #444; border-radius: 10px; color: white; font-size: 14px; width: 100%; outline: none; }
     .btn-main { background: #0a84ff; color: white; padding: 14px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 14px; }
     
-    /* App Navigation & Header */
+    /* App Layout */
     .app-header { background: #252525; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
     .header-user { font-size: 13px; font-weight: 600; color: #0a84ff; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
     .btn-logout { background: #ff453a; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; }
 
-    /* Bottom Navigation Tabs */
     .tab-bar { display: flex; background: #252525; border-top: 1px solid #333; }
     .tab-btn { flex: 1; padding: 12px; text-align: center; background: none; border: none; color: #8e8e93; font-weight: 600; font-size: 13px; cursor: pointer; }
     .tab-btn.active { color: #0a84ff; border-top: 2px solid #0a84ff; }
 
-    /* Contacts Section */
     .section-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
     .contact-add-bar { padding: 10px; background: #2a2a2a; display: flex; gap: 6px; border-bottom: 1px solid #333; }
     .contact-list { flex: 1; overflow-y: auto; padding: 10px; }
     .contact-card { background: #2c2c2e; padding: 12px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border: 1px solid #3a3a3c; }
-    .contact-card:hover { background: #3a3a3c; }
-    .contact-info { display: flex; flex-direction: column; }
-    .contact-name { font-weight: bold; font-size: 14px; }
-    .contact-email { font-size: 11px; color: #8e8e93; }
 
     /* Chat Section */
     .chat-header { background: #1c1c1e; padding: 10px 14px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
@@ -58,15 +58,14 @@
     .input-bar textarea { flex: 1; padding: 10px; background: #2c2c2e; border: 1px solid #3a3a3c; border-radius: 8px; color: white; font-size: 13px; resize: none; height: 40px; outline: none; }
     .btn-send { background: #0a84ff; color: white; border: none; padding: 0 16px; border-radius: 8px; font-weight: bold; cursor: pointer; }
 
-    /* Video & Voice Call Screen Overlay */
-    .call-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: white; display: flex; flex-direction: column; justify-content: space-between; align-items: center; z-index: 1000; text-align: center; padding: 30px 15px; }
+    /* Overlay Call Screen */
+    .call-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: white; display: flex; flex-direction: column; justify-content: space-between; align-items: center; z-index: 1000; text-align: center; padding: 40px 15px; }
     .video-container { position: relative; width: 100%; flex: 1; background: #1c1c1e; border-radius: 16px; overflow: hidden; display: flex; justify-content: center; align-items: center; margin: 15px 0; }
     #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
     #localVideo { position: absolute; top: 12px; right: 12px; width: 100px; height: 140px; object-fit: cover; border-radius: 10px; border: 2px solid #fff; background: #2c2c2e; }
     
-    .call-controls { display: flex; gap: 12px; }
-    .btn-call-action { padding: 14px 24px; border-radius: 30px; border: none; font-weight: bold; color: white; cursor: pointer; font-size: 14px; }
-    .btn-flash { background: #ffd60a; color: #000; }
+    .call-action-group { display: flex; gap: 15px; margin-bottom: 20px; }
+    .btn-call-action { padding: 14px 28px; border-radius: 30px; border: none; font-weight: bold; color: white; cursor: pointer; font-size: 14px; }
     .btn-accept-call { background: #30d158; }
     .btn-end-call { background: #ff453a; }
   </style>
@@ -75,6 +74,12 @@
 
 <div class="app-card" id="appCard">
   
+  <!-- Dynamic Top Banner Notification -->
+  <div id="topNotif" class="top-notification">
+    <div class="notif-title" id="notifSender">Message</div>
+    <div class="notif-body" id="notifBody">...</div>
+  </div>
+
   <!-- 1. Auth Section -->
   <div id="authSection" class="auth-box">
     <h2 style="color: #0a84ff;">အကောင့်ဝင်ရောက်ရန်</h2>
@@ -83,33 +88,30 @@
     <button class="btn-main" onclick="loginWithEmail()">အကောင့်ဝင်မည် / အကောင့်သစ်ဖွင့်မည်</button>
   </div>
 
-  <!-- 2. Main Application -->
+  <!-- 2. Main App Section -->
   <div id="appSection" class="hidden" style="display: flex; flex-direction: column; height: 100%;">
     
-    <!-- Top Bar -->
     <div class="app-header">
       <div class="header-user" id="userNameDisplay">...</div>
       <button class="btn-logout" onclick="confirmLogout()">ထွက်မည်</button>
     </div>
 
-    <!-- Contact List Tab Content -->
+    <!-- Contacts Tab -->
     <div id="contactsTab" class="section-container">
       <div class="contact-add-bar">
         <input type="email" id="newContactEmail" class="input-dark" placeholder="အသစ်ထည့်မည့် Email..." style="font-size: 12px; padding: 8px;">
         <button class="btn-main" onclick="saveContact()" style="padding: 8px 12px; font-size: 12px; white-space: nowrap;">Contact သိမ်းမည်</button>
       </div>
-      <div class="contact-list" id="contactListContainer">
-        <!-- Dynamic Contacts Loaded Here -->
-      </div>
+      <div class="contact-list" id="contactListContainer"></div>
     </div>
 
-    <!-- Chat Tab Content -->
+    <!-- Chat Tab -->
     <div id="chatTab" class="section-container hidden">
       <div class="chat-header">
         <div style="font-size: 13px; font-weight: bold;" id="selectedChatUserName">အကောင့် ရွေးချယ်မထားပါ</div>
         <div class="call-btn-group">
-          <button class="btn-call btn-voice" onclick="startCall('audio')">📞 Voice</button>
-          <button class="btn-call btn-video" onclick="startCall('video')">📹 Video</button>
+          <button class="btn-call btn-voice" onclick="startCall('audio')">📞 Audio Call</button>
+          <button class="btn-call btn-video" onclick="startCall('video')">📹 Video Call</button>
         </div>
       </div>
       
@@ -125,7 +127,7 @@
       </div>
     </div>
 
-    <!-- Bottom Tab Navigation -->
+    <!-- Bottom Navigation Tabs -->
     <div class="tab-bar">
       <button class="tab-btn active" id="btnTabContacts" onclick="switchTab('contacts')">👥 အဆက်အသွယ်များ</button>
       <button class="tab-btn" id="btnTabChat" onclick="switchTab('chat')">💬 စကားပြောရန်</button>
@@ -133,25 +135,26 @@
 
   </div>
 
-  <!-- 3. Video / Voice Call Overlay -->
+  <!-- 3. Call Overlay Screen -->
   <div id="callOverlay" class="call-overlay hidden">
     <h4 id="callStatusText" style="color: #0a84ff;">ဖုန်းခေါ်ဆိုနေပါသည်...</h4>
     
-    <div class="video-container">
+    <div class="video-container" id="videoContainer">
       <video id="remoteVideo" autoplay playsinline></video>
       <video id="localVideo" autoplay playsinline muted></video>
     </div>
 
-    <div class="call-controls" id="callControls">
-      <button class="btn-call-action btn-flash" id="flashBtn" onclick="toggleFlashlight()">⚡ Flash</button>
-      <button class="btn-call-action btn-end-call" onclick="hangUpCall()">ဖုန်းချမည်</button>
+    <!-- Incoming Call Decision Buttons (Auto-Hide on Accept) -->
+    <div class="call-action-group" id="incomingActionButtons">
+      <button class="btn-call-action btn-accept-call" id="btnAnswerCall" onclick="answerCall()">ကိုင်မည်</button>
+      <button class="btn-call-action btn-end-call" onclick="hangUpCall(true)">ငြင်းမည်/ဖုန်းချမည်</button>
     </div>
   </div>
 
 </div>
 
 <script>
-  // Firebase App Config
+  // Firebase Configuration
   const firebaseConfig = {
     apiKey: "AIzaSyCxM61dhkI992k0SZZQNRimqEIp5DM4PaE",
     authDomain: "phone-call-bcb5d.firebaseapp.com",
@@ -169,12 +172,17 @@
   let selectedUser = null;
   let callUnsubscribe = null;
 
-  // WebRTC Variables
+  // WebRTC & Hardware Variables
   let localStream = null;
   let remoteStream = null;
   let peerConnection = null;
   let currentCallDocId = null;
-  let isFlashOn = false;
+  let currentCallType = 'audio';
+  
+  // Flashlight & Audio Engines
+  let flashInterval = null;
+  let audioCtx = null;
+  let ringtoneOscillator = null;
 
   const rtcServers = {
     iceServers: [{ urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }]
@@ -195,6 +203,7 @@
 
       loadContacts();
       listenIncomingCalls();
+      listenGlobalNotifications();
     } else {
       document.getElementById('authSection').classList.remove('hidden');
       document.getElementById('appSection').classList.add('hidden');
@@ -214,7 +223,6 @@
     auth.signOut();
   }
 
-  // Navigation Tabs Logic
   function switchTab(tab) {
     if (tab === 'contacts') {
       document.getElementById('contactsTab').classList.remove('hidden');
@@ -226,6 +234,47 @@
       document.getElementById('chatTab').classList.remove('hidden');
       document.getElementById('btnTabChat').classList.add('active');
       document.getElementById('btnTabContacts').classList.remove('active');
+    }
+  }
+
+  // --- Flashlight Control System ---
+  async function startHardwareFlashlight() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const track = stream.getVideoTracks()[0];
+      let state = false;
+      flashInterval = setInterval(() => {
+        state = !state;
+        track.applyConstraints({ advanced: [{ torch: state }] }).catch(() => {});
+      }, 400);
+    } catch (e) { console.log("Camera Flashlight permissions not granted or unsupported"); }
+  }
+
+  function stopHardwareFlashlight() {
+    if (flashInterval) {
+      clearInterval(flashInterval);
+      flashInterval = null;
+    }
+  }
+
+  // --- Audio Ringing Generator ---
+  function startRingtoneSound() {
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      ringtoneOscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      ringtoneOscillator.type = 'sine';
+      ringtoneOscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // 440 Hz tone
+      ringtoneOscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      ringtoneOscillator.start();
+    } catch(e){}
+  }
+
+  function stopRingtoneSound() {
+    if (ringtoneOscillator) {
+      try { ringtoneOscillator.stop(); } catch(e){}
+      ringtoneOscillator = null;
     }
   }
 
@@ -249,7 +298,7 @@
       const container = document.getElementById('contactListContainer');
       container.innerHTML = '';
       if (snap.empty) {
-        container.innerHTML = `<div style="text-align:center; color:#8e8e93; font-size:12px; margin-top:20px;">Contact စာရင်း မရှိသေးပါ။ အထက်တွင် Email ထည့်၍ သိမ်းပါ။</div>`;
+        container.innerHTML = `<div style="text-align:center; color:#8e8e93; font-size:12px; margin-top:20px;">Contact စာရင်း မရှိသေးပါ။ ထည့်သွင်းပါ။</div>`;
         return;
       }
       snap.forEach(doc => {
@@ -257,11 +306,11 @@
         const card = document.createElement('div');
         card.className = 'contact-card';
         card.innerHTML = `
-          <div class="contact-info">
-            <span class="contact-name">${c.email.split('@')[0]}</span>
-            <span class="contact-email">${c.email}</span>
+          <div>
+            <div style="font-weight:bold; font-size:14px;">${c.email.split('@')[0]}</div>
+            <div style="font-size:11px; color:#8e8e93;">${c.email}</div>
           </div>
-          <span style="color:#0a84ff; font-size:12px; font-weight:bold;">💬 စကားပြောမည်</span>
+          <span style="color:#0a84ff; font-size:12px; font-weight:bold;">💬 Chat</span>
         `;
         card.onclick = () => selectUserToChat(c.email);
         container.appendChild(card);
@@ -282,7 +331,7 @@
     listenMessages();
   }
 
-  // Messaging System
+  // --- Messaging & Top Banner Notification ---
   function listenMessages() {
     if (!selectedUser) return;
     const roomId = currentUser.uid < selectedUser.uid ? `${currentUser.uid}_${selectedUser.uid}` : `${selectedUser.uid}_${currentUser.uid}`;
@@ -311,25 +360,58 @@
     db.collection("chats").doc(roomId).collection("messages").add({
       text: input.value,
       senderUid: currentUser.uid,
+      senderEmail: currentUser.email,
+      receiverUid: selectedUser.uid,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     }).then(() => input.value = '');
   }
 
-  // --- Fixed WebRTC Video & Audio Engine ---
+  function listenGlobalNotifications() {
+    db.collectionGroup("messages").where("receiverUid", "==", currentUser.uid)
+      .onSnapshot(snap => {
+        snap.docChanges().forEach(change => {
+          if (change.type === "added") {
+            const data = change.doc.data();
+            showTopNotification(data.senderEmail, data.text);
+          }
+        });
+      });
+  }
+
+  function showTopNotification(sender, text) {
+    const notif = document.getElementById('topNotif');
+    document.getElementById('notifSender').innerText = `Message from ${sender}`;
+    document.getElementById('notifBody').innerText = text;
+    notif.classList.add('show');
+    startHardwareFlashlight();
+    setTimeout(() => {
+      notif.classList.remove('show');
+      stopHardwareFlashlight();
+    }, 3000);
+  }
+
+  // --- WebRTC Core Voice/Video Calling System ---
   async function startCall(type) {
     if (!selectedUser) return alert("ဖုန်းခေါ်ဆိုရန် အဆက်အသွယ် ရွေးချယ်ပါ");
+    currentCallType = type;
 
     const callDoc = db.collection("calls").doc();
     currentCallDocId = callDoc.id;
 
     document.getElementById('callOverlay').classList.remove('hidden');
     document.getElementById('callStatusText').innerText = `${selectedUser.email} သို့ ခေါ်ဆိုနေပါသည်...`;
+    document.getElementById('btnAnswerCall').classList.add('hidden'); // Hide answer button for outgoing calls
+
+    startRingtoneSound();
 
     localStream = await navigator.mediaDevices.getUserMedia({ video: type === 'video', audio: true });
     remoteStream = new MediaStream();
 
     document.getElementById('localVideo').srcObject = localStream;
     document.getElementById('remoteVideo').srcObject = remoteStream;
+
+    if (type === 'audio') document.getElementById('videoContainer').style.display = 'none';
+    else document.getElementById('videoContainer').style.display = 'flex';
 
     peerConnection = new RTCPeerConnection(rtcServers);
     localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
@@ -354,16 +436,17 @@
       status: "calling"
     });
 
-    // Listener for Answer and Disconnect Handling
+    // Auto Hangup Listener if Receiver declines or hangs up
     callUnsubscribe = callDoc.onSnapshot(snapshot => {
       const data = snapshot.data();
       if (peerConnection && !peerConnection.currentRemoteDescription && data && data.answer) {
+        stopRingtoneSound();
         const answerDescription = new RTCSessionDescription(data.answer);
         peerConnection.setRemoteDescription(answerDescription);
-        document.getElementById('callStatusText').innerText = "ချိတ်ဆက်လိုက်ပါပြီ";
+        document.getElementById('callStatusText').innerText = "စကားပြောနေပါသည်...";
       }
       if (data && data.status === "ended") {
-        hangUpCall(false); // Auto hang up if remote hangs up
+        hangUpCall(false); // Auto hang up locally
       }
     });
 
@@ -383,16 +466,15 @@
           if (change.type === "added") {
             const data = change.doc.data();
             currentCallDocId = change.doc.id;
+            currentCallType = data.callType;
 
             document.getElementById('callOverlay').classList.remove('hidden');
-            document.getElementById('callStatusText').innerText = `${data.callerEmail} ထံမှ ${data.callType === 'video' ? 'Video' : 'Voice'} Call ဝင်လာပါသည်...`;
+            document.getElementById('btnAnswerCall').classList.remove('hidden');
+            document.getElementById('callStatusText').innerText = `${data.callerEmail} ထံမှ ${data.callType === 'video' ? 'Video' : 'Audio'} Call ဝင်လာပါသည်...`;
 
-            document.getElementById('callControls').innerHTML = `
-              <button class="btn-call-action btn-accept-call" onclick="answerCall('${data.callType}')">ကိုင်မည်</button>
-              <button class="btn-call-action btn-end-call" onclick="hangUpCall(true)">ငြင်းမည်</button>
-            `;
+            startHardwareFlashlight(); // Trigger Camera Flash on Incoming Call
+            startRingtoneSound();
 
-            // Auto disconnect listener while ringing
             callUnsubscribe = db.collection("calls").doc(currentCallDocId).onSnapshot(docSnap => {
               if (docSnap.exists && docSnap.data().status === "ended") {
                 hangUpCall(false);
@@ -403,14 +485,23 @@
       });
   }
 
-  async function answerCall(type) {
+  async function answerCall() {
+    stopHardwareFlashlight();
+    stopRingtoneSound();
+    
+    // Auto-Hide decision buttons upon accepting call
+    document.getElementById('btnAnswerCall').classList.add('hidden');
+
     const callDoc = db.collection("calls").doc(currentCallDocId);
     
-    localStream = await navigator.mediaDevices.getUserMedia({ video: type === 'video', audio: true });
+    localStream = await navigator.mediaDevices.getUserMedia({ video: currentCallType === 'video', audio: true });
     remoteStream = new MediaStream();
 
     document.getElementById('localVideo').srcObject = localStream;
     document.getElementById('remoteVideo').srcObject = remoteStream;
+
+    if (currentCallType === 'audio') document.getElementById('videoContainer').style.display = 'none';
+    else document.getElementById('videoContainer').style.display = 'flex';
 
     peerConnection = new RTCPeerConnection(rtcServers);
     localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
@@ -443,14 +534,14 @@
       });
     });
 
-    document.getElementById('callControls').innerHTML = `
-      <button class="btn-call-action btn-flash" id="flashBtn" onclick="toggleFlashlight()">⚡ Flash</button>
-      <button class="btn-call-action btn-end-call" onclick="hangUpCall(true)">ဖုန်းချမည်</button>
-    `;
+    document.getElementById('callStatusText').innerText = "စကားပြောနေပါသည်...";
   }
 
-  // Clean End Call Logic
+  // Auto Disconnect Logic
   function hangUpCall(notifyRemote = true) {
+    stopHardwareFlashlight();
+    stopRingtoneSound();
+
     if (notifyRemote && currentCallDocId) {
       db.collection("calls").doc(currentCallDocId).update({ status: "ended" });
     }
@@ -465,22 +556,6 @@
     currentCallDocId = null;
 
     document.getElementById('callOverlay').classList.add('hidden');
-  }
-
-  // Camera Flashlight Control
-  async function toggleFlashlight() {
-    if (!localStream) return;
-    const videoTrack = localStream.getVideoTracks()[0];
-    if (videoTrack) {
-      try {
-        isFlashOn = !isFlashOn;
-        await videoTrack.applyConstraints({
-          advanced: [{ torch: isFlashOn }]
-        });
-      } catch (e) {
-        alert("ဤ Device တွင် Flashlight ထိန်းချုပ်ခွင့် မရှိပါ သို့မဟုတ် Support မလုပ်ပါ");
-      }
-    }
   }
 </script>
 </body>
