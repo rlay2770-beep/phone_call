@@ -25,7 +25,7 @@
 
     /* App Layout */
     .app-header { background: #007aff; color: white; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
-    .header-user { font-size: 12px; font-weight: 600; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .header-user { font-size: 12px; font-weight: 600; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .header-actions { display: flex; gap: 4px; }
     .btn-action { color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; }
     .btn-voice { background: #28a745; }
@@ -38,8 +38,7 @@
     .btn-search { background: #007aff; color: white; border: none; padding: 0 12px; border-radius: 12px; font-size: 12px; cursor: pointer; }
 
     .users-bar { background: #ffffff; border-bottom: 1px solid #e9ecef; padding: 6px 8px; }
-    .user-list { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
-    .user-chip { background: #e9ecef; border: 1px solid #ced4da; padding: 4px 10px; border-radius: 16px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+    .user-chip { background: #e9ecef; border: 1px solid #ced4da; padding: 4px 10px; border-radius: 16px; font-size: 12px; cursor: pointer; white-space: nowrap; display: inline-block; margin-right: 4px; }
     .user-chip.active { background: #007aff; color: white; border-color: #007aff; }
 
     .chat-box { flex: 1; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #fafafa; }
@@ -51,7 +50,7 @@
     .input-bar textarea { flex: 1; padding: 8px; border: 1px solid #ced4da; border-radius: 8px; font-size: 13px; resize: none; height: 42px; }
     .btn-send { background: #007aff; color: white; border: none; padding: 0 14px; border-radius: 8px; font-weight: bold; cursor: pointer; }
 
-    /* Video & Voice Call Screen Overlay */
+    /* Video Call Overlay */
     .call-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #1c1c1e; color: white; display: flex; flex-direction: column; justify-content: space-between; align-items: center; z-index: 500; text-align: center; padding: 20px 10px; }
     .video-container { position: relative; width: 100%; height: 75%; background: #000; border-radius: 12px; overflow: hidden; display: flex; justify-content: center; align-items: center; }
     #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
@@ -95,13 +94,13 @@
     </div>
 
     <div class="users-bar">
-      <div style="font-size: 11px; color: #666; margin-bottom: 3px;">အွန်လိုင်းရှိသူများ / စကားပြောဖော်များ:</div>
-      <div class="user-list" id="usersList"></div>
+      <div style="font-size: 11px; color: #666; margin-bottom: 3px;">လက်ရှိ စကားပြောနေသူ:</div>
+      <div id="usersList"></div>
     </div>
 
     <div class="chat-box" id="chatBox">
       <div style="text-align: center; color: #8e8e93; font-size: 12px; margin-top: 20px;" id="chatPlaceholder">
-        စာပို့ရန် သို့မဟုတ် ဖုန်းခေါ်ဆိုရန် အထက်တွင် အသုံးပြုသူ ရွေးချယ်ပါ သို့မဟုတ် Email ရိုက်ထည့်ပါ။
+        စာပို့ရန် သို့မဟုတ် ဖုန်းခေါ်ဆိုရန် အထက်တွင် Email ရိုက်ထည့်ပြီး "ချိတ်ဆက်မည်" ကို နှိပ်ပါ။
       </div>
     </div>
 
@@ -128,7 +127,7 @@
 </div>
 
 <script>
-  // Firebase App Config
+  // Firebase Configuration
   const firebaseConfig = {
     apiKey: "AIzaSyCxM61dhkI992k0SZZQNRimqEIp5DM4PaE",
     authDomain: "phone-call-bcb5d.firebaseapp.com",
@@ -166,12 +165,11 @@
       // Save user session to Firestore
       db.collection("users").doc(user.uid).set({
         name: user.displayName || user.email.split('@')[0],
-        email: user.email,
+        email: user.email.toLowerCase(),
         uid: user.uid,
         online: true
       }, { merge: true });
 
-      listenUserList();
       listenIncomingCalls();
     } else {
       document.getElementById('authSection').classList.remove('hidden');
@@ -199,48 +197,47 @@
     auth.signOut();
   }
 
-  // Active Users Listener
-  function listenUserList() {
-    db.collection("users").onSnapshot(snap => {
-      const list = document.getElementById('usersList');
-      list.innerHTML = '';
-      snap.forEach(doc => {
-        const u = doc.data();
-        if (u.uid !== currentUser.uid) {
-          const div = document.createElement('div');
-          div.className = `user-chip ${selectedUser && selectedUser.uid === u.uid ? 'active' : ''}`;
-          div.innerText = u.email || u.name;
-          div.onclick = () => selectTargetUser(u);
-          list.appendChild(div);
-        }
-      });
-    });
-  }
+  // --- Email ဖြင့် ချိတ်ဆက်မည့် Function (ပြင်ဆင်ပြီး) ---
+  async function connectUserByEmail() {
+    const emailInput = document.getElementById('targetUserEmail');
+    const email = emailInput.value.trim().toLowerCase();
 
-  // Connect to target Email directly
-  function connectUserByEmail() {
-    const email = document.getElementById('targetUserEmail').value.trim();
-    if (!email) return alert("Email ရိုက်ထည့်ပါ");
-    
-    db.collection("users").where("email", "==", email).get().then(snap => {
-      if (snap.empty) {
-        // Create dynamic target
-        const target = { uid: email.replace(/[^a-zA-Z0-9]/g, "_"), email: email, name: email };
-        selectTargetUser(target);
+    if (!email) return alert("ကျေးဇူးပြု၍ စကားပြောလိုသူ၏ Email ကို ရိုက်ထည့်ပါ");
+    if (currentUser && email === currentUser.email.toLowerCase()) return alert("မိမိ Email ကို မိမိ ပြန်လည် ချိတ်ဆက်၍ မရပါ");
+
+    try {
+      const snapshot = await db.collection("users").where("email", "==", email).get();
+
+      if (!snapshot.empty) {
+        snapshot.forEach(doc => {
+          selectedUser = doc.data();
+        });
       } else {
-        snap.forEach(doc => selectTargetUser(doc.data()));
+        // Firestore ထဲ အကောင့်မရှိသေးပါကလည်း ID တစ်ခု ဖန်တီး၍ ချိတ်ဆက်ခွင့်ပေးမည်
+        const tempUid = "user_" + email.replace(/[^a-zA-Z0-9]/g, "_");
+        selectedUser = {
+          uid: tempUid,
+          email: email,
+          name: email.split('@')[0]
+        };
       }
-    });
+
+      // UI ကို Active လုပ်ခြင်း
+      document.getElementById('chatPlaceholder').classList.add('hidden');
+      document.getElementById('usersList').innerHTML = `<div class="user-chip active">${selectedUser.email}</div>`;
+      
+      alert(`${selectedUser.email} နှင့် ချိတ်ဆက်လိုက်ပါပြီ။ စာပို့/ဖုန်းခေါ်ဆိုနိုင်ပါပြီ။`);
+      
+      listenMessages();
+      emailInput.value = '';
+
+    } catch (error) {
+      console.error("Connection Error: ", error);
+      alert("ချိတ်ဆက်မှု မအောင်မြင်ပါ: " + error.message);
+    }
   }
 
-  function selectTargetUser(user) {
-    selectedUser = user;
-    document.getElementById('chatPlaceholder').classList.add('hidden');
-    listenMessages();
-    listenUserList();
-  }
-
-  // Messaging System
+  // Chat Listening & Sending
   function listenMessages() {
     if (!selectedUser) return;
     const roomId = currentUser.uid < selectedUser.uid ? `${currentUser.uid}_${selectedUser.uid}` : `${selectedUser.uid}_${currentUser.uid}`;
@@ -273,9 +270,9 @@
     }).then(() => input.value = '');
   }
 
-  // --- WebRTC Video & Audio Calling Engine ---
+  // --- WebRTC Video & Voice Calling ---
   async function initiateCall(type) {
-    if (!selectedUser) return alert("ဖုန်းခေါ်ဆိုရန် အသုံးပြုသူ ရွေးချယ်ပါ");
+    if (!selectedUser) return alert("ဖုန်းခေါ်ဆိုရန် Email အရင်ရိုက်ထည့်ပြီး ချိတ်ဆက်ပါ");
 
     const callDoc = db.collection("calls").doc();
     currentCallDocId = callDoc.id;
