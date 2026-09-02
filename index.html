@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Complete WebRTC Call & Chat App</title>
+  <title>Enhanced WebRTC & Chat App</title>
 
   <!-- Firebase Web SDK (Compat Engine) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -21,7 +21,7 @@
     
     .hidden { display: none !important; }
 
-    /* Top Banner Notification (Message System) */
+    /* Top Banner Notification */
     .top-notification { position: absolute; top: 10px; left: 5%; right: 5%; background: rgba(30, 30, 30, 0.95); border: 1px solid #0a84ff; border-radius: 12px; padding: 12px; z-index: 2000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 4px; transform: translateY(-120%); transition: transform 0.3s ease; backdrop-filter: blur(8px); }
     .top-notification.show { transform: translateY(0); }
     .notif-title { font-size: 11px; color: #0a84ff; font-weight: bold; }
@@ -53,42 +53,54 @@
     .btn-voice { background: #30d158; }
     .btn-video { background: #5e5ce6; }
 
-    .chat-box { flex: 1; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #141414; }
-    .msg { padding: 10px 14px; border-radius: 14px; font-size: 13px; max-width: 75%; word-break: break-word; }
-    .msg.me { background: #0a84ff; color: white; align-self: flex-end; }
-    .msg.them { background: #2c2c2e; color: white; align-self: flex-start; }
+    /* Enhanced Messages Box & Tick Statuses */
+    .chat-box { flex: 1; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #141414; }
+    .msg { padding: 10px 12px; border-radius: 14px; font-size: 13px; max-width: 78%; word-break: break-word; position: relative; display: flex; flex-direction: column; }
+    .msg.me { background: #0a84ff; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+    .msg.them { background: #2c2c2e; color: white; align-self: flex-start; border-bottom-left-radius: 2px; }
+    
+    .msg-meta { display: flex; align-items: center; justify-content: flex-end; gap: 4px; font-size: 10px; color: rgba(255, 255, 255, 0.7); margin-top: 4px; align-self: flex-end; }
+    .tick-icon { font-size: 11px; font-weight: bold; }
+    .tick-seen { color: #30d158; } /* Read status (Green/Blue ticks) */
 
     .input-bar { padding: 10px; background: #1c1c1e; border-top: 1px solid #333; display: flex; gap: 8px; }
     .input-bar textarea { flex: 1; padding: 10px; background: #2c2c2e; border: 1px solid #3a3a3c; border-radius: 8px; color: white; font-size: 13px; resize: none; height: 40px; outline: none; }
     .btn-send { background: #0a84ff; color: white; border: none; padding: 0 16px; border-radius: 8px; font-weight: bold; cursor: pointer; }
 
-    /* Fully Redesigned Clean Overlay Call Screen */
-    .call-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: white; display: flex; flex-direction: column; justify-content: space-between; align-items: center; z-index: 1000; padding: 20px 0; }
+    /* Call Screen with Auto-Hiding Controls & Perfect Camera Alignment */
+    .call-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: white; display: flex; flex-direction: column; justify-content: space-between; align-items: center; z-index: 1000; overflow: hidden; }
     
-    .call-info-header { position: absolute; top: 20px; z-index: 10; text-align: center; width: 100%; background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%); padding-bottom: 20px; }
-    .call-info-header h4 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
-    .call-info-header p { font-size: 13px; color: #30d158; }
+    .call-info-header { position: absolute; top: 20px; z-index: 10; text-align: center; width: 100%; background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%); padding-bottom: 20px; pointer-events: none; }
+    .call-info-header h4 { font-size: 16px; font-weight: 600; margin-bottom: 2px; }
+    .call-info-header p { font-size: 12px; color: #30d158; }
 
-    /* Full-Screen Video Container */
-    .video-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #111; overflow: hidden; display: flex; justify-content: center; align-items: center; }
-    #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
-    #localVideo { position: absolute; top: 80px; right: 16px; width: 110px; height: 160px; object-fit: cover; border-radius: 12px; border: 2px solid rgba(255,255,255,0.4); background: #2c2c2e; box-shadow: 0 8px 20px rgba(0,0,0,0.6); z-index: 5; transition: all 0.3s ease; }
+    /* Full Camera Aspect Ratio Adjustment */
+    .video-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; display: flex; justify-content: center; align-items: center; }
     
-    /* Sleek Audio & Call Control Bar */
-    .call-controls-panel { position: absolute; bottom: 30px; z-index: 10; width: 90%; background: rgba(30, 30, 30, 0.75); backdrop-filter: blur(16px); padding: 16px; border-radius: 28px; display: flex; flex-direction: column; gap: 14px; border: 1px solid rgba(255,255,255,0.1); }
+    /* Display Full Person Center-Aligned Without Cutoffs */
+    #remoteVideo { width: 100%; height: 100%; object-fit: contain; background: #050505; }
+    #localVideo { position: absolute; top: 70px; right: 14px; width: 95px; height: 140px; object-fit: cover; border-radius: 10px; border: 1.5px solid rgba(255,255,255,0.5); background: #2c2c2e; box-shadow: 0 6px 16px rgba(0,0,0,0.6); z-index: 5; }
     
-    .volume-slider-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 0 8px; }
-    .volume-slider-row input[type="range"] { flex: 1; accent-color: #0a84ff; height: 4px; }
+    /* Compact, Sleek & Auto-Hiding Control Bar */
+    .call-controls-panel { position: absolute; bottom: 24px; z-index: 20; width: 86%; background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(16px); padding: 12px 16px; border-radius: 20px; display: flex; flex-direction: column; gap: 10px; border: 1px solid rgba(255,255,255,0.12); transition: opacity 0.4s ease, transform 0.4s ease; }
+    
+    .call-controls-panel.fade-out { opacity: 0; transform: translateY(20px); pointer-events: none; }
 
-    .action-buttons-row { display: flex; justify-content: space-evenly; align-items: center; width: 100%; }
-    .btn-round { width: 52px; height: 52px; border-radius: 50%; border: none; color: white; font-size: 18px; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: background 0.2s; }
-    .btn-round.grey { background: rgba(255,255,255,0.2); }
+    .volume-slider-row { display: flex; align-items: center; gap: 10px; width: 100%; }
+    .volume-slider-row input[type="range"] { flex: 1; accent-color: #0a84ff; height: 3px; }
+
+    .action-buttons-row { display: flex; justify-content: space-around; align-items: center; width: 100%; }
+    
+    /* Resized Compact Buttons */
+    .btn-round { width: 44px; height: 44px; border-radius: 50%; border: none; color: white; font-size: 15px; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: transform 0.1s; }
+    .btn-round:active { transform: scale(0.92); }
+    .btn-round.grey { background: rgba(255,255,255,0.22); }
     .btn-round.grey.active { background: #ff9500; }
-    .btn-round.green { background: #30d158; width: 60px; height: 60px; }
-    .btn-round.red { background: #ff453a; width: 60px; height: 60px; }
+    .btn-round.green { background: #30d158; width: 52px; height: 52px; font-size: 18px; }
+    .btn-round.red { background: #ff453a; width: 52px; height: 52px; font-size: 18px; }
   </style>
 </head>
-<body>
+<body onclick="resetControlHideTimer()">
 
 <div class="app-card" id="appCard">
   
@@ -128,8 +140,8 @@
       <div class="chat-header">
         <div style="font-size: 13px; font-weight: bold;" id="selectedChatUserName">အကောင့် ရွေးချယ်မထားပါ</div>
         <div class="call-btn-group">
-          <button class="btn-call btn-voice" onclick="startCall('audio')">📞 Audio Call</button>
-          <button class="btn-call btn-video" onclick="startCall('video')">📹 Video Call</button>
+          <button class="btn-call btn-voice" onclick="startCall('audio')">📞 Voice</button>
+          <button class="btn-call btn-video" onclick="startCall('video')">📹 Video</button>
         </div>
       </div>
       
@@ -154,25 +166,25 @@
   </div>
 
   <!-- 3. Full-Screen Modern Call Overlay -->
-  <div id="callOverlay" class="call-overlay hidden">
+  <div id="callOverlay" class="call-overlay hidden" onclick="toggleCallControls(event)">
     
     <div class="call-info-header">
       <h4 id="callUserTitle">User Email</h4>
       <p id="callStatusText">ဖုန်းခေါ်ဆိုနေပါသည်...</p>
     </div>
 
-    <!-- Full Aspect-Ratio Dynamic Video Container -->
+    <!-- Correct Aspect Ratio Dynamic Video View Container -->
     <div class="video-container" id="videoContainer">
       <video id="remoteVideo" autoplay playsinline></video>
       <video id="localVideo" autoplay playsinline muted></video>
     </div>
 
-    <!-- Always Visible Control Panel -->
-    <div class="call-controls-panel">
+    <!-- Auto-Hiding Control Panel -->
+    <div class="call-controls-panel" id="controlsPanel" onclick="event.stopPropagation()">
       <div class="volume-slider-row">
-        <span style="font-size: 12px; color: #8e8e93;">📁</span>
+        <span style="font-size: 11px; color: #8e8e93;">📁</span>
         <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1" oninput="changeRemoteVolume(this.value)">
-        <span style="font-size: 14px;">🔊</span>
+        <span style="font-size: 12px;">🔊</span>
       </div>
 
       <div class="action-buttons-row">
@@ -215,11 +227,14 @@
   let currentCallDocId = null;
   let currentCallType = 'audio';
   
-  // Flashlight & Audio Engines
+  // Flashlight & Audio Engine
   let flashInterval = null;
   let flashStreamTrack = null;
   let audioCtx = null;
   let ringtoneOscillator = null;
+
+  // Auto-hide controls timer
+  let hideControlsTimeout = null;
 
   const rtcServers = {
     iceServers: [{ urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }]
@@ -274,6 +289,32 @@
     }
   }
 
+  // --- Auto-Hiding Controls Logic ---
+  function resetControlHideTimer() {
+    const panel = document.getElementById('controlsPanel');
+    if (!panel) return;
+    panel.classList.remove('fade-out');
+
+    if (hideControlsTimeout) clearTimeout(hideControlsTimeout);
+    
+    // Auto-hide after 4 seconds of inactivity
+    hideControlsTimeout = setTimeout(() => {
+      const callOverlay = document.getElementById('callOverlay');
+      if (!callOverlay.classList.contains('hidden')) {
+        panel.classList.add('fade-out');
+      }
+    }, 4000);
+  }
+
+  function toggleCallControls(e) {
+    const panel = document.getElementById('controlsPanel');
+    if (panel.classList.contains('fade-out')) {
+      resetControlHideTimer();
+    } else {
+      panel.classList.add('fade-out');
+    }
+  }
+
   // --- Flashlight Control System ---
   async function startHardwareFlashlight() {
     try {
@@ -284,7 +325,7 @@
         state = !state;
         flashStreamTrack.applyConstraints({ advanced: [{ torch: state }] }).catch(() => {});
       }, 400);
-    } catch (e) { console.log("Flashlight unsupported or denied."); }
+    } catch (e) {}
   }
 
   function stopHardwareFlashlight() {
@@ -299,9 +340,9 @@
     }
   }
 
-  // --- Fixed Audio Ringing Generator ---
+  // --- Ringing Audio System ---
   function startRingtoneSound() {
-    stopRingtoneSound(); // Ensure clean previous instance
+    stopRingtoneSound();
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       ringtoneOscillator = audioCtx.createOscillator();
@@ -335,6 +376,7 @@
       btn.innerText = audioTrack.enabled ? "🎤" : "🎙️";
       btn.classList.toggle('active', !audioTrack.enabled);
     }
+    resetControlHideTimer();
   }
 
   function toggleMuteSpeaker() {
@@ -343,11 +385,13 @@
     const btn = document.getElementById('btnMuteSpeaker');
     btn.innerText = videoElem.muted ? "🔇" : "🔊";
     btn.classList.toggle('active', videoElem.muted);
+    resetControlHideTimer();
   }
 
   function changeRemoteVolume(val) {
     const videoElem = document.getElementById('remoteVideo');
     videoElem.volume = val;
+    resetControlHideTimer();
   }
 
   // --- Contacts Management ---
@@ -403,7 +447,7 @@
     listenMessages();
   }
 
-  // --- Messaging & Top Banner Notification ---
+  // --- Messaging & Read Status (Ticks & Timestamp) System ---
   function listenMessages() {
     if (!selectedUser) return;
     const roomId = currentUser.uid < selectedUser.uid ? `${currentUser.uid}_${selectedUser.uid}` : `${selectedUser.uid}_${currentUser.uid}`;
@@ -414,16 +458,35 @@
         box.innerHTML = '';
         snap.forEach(doc => {
           const m = doc.data();
+          
+          // Mark as Seen if received
+          if (m.receiverUid === currentUser.uid && !m.seen) {
+            doc.ref.update({ seen: true });
+          }
+
+          const timeStr = m.timestamp ? new Date(m.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+          
+          let tickStatus = '';
+          if (m.senderUid === currentUser.uid) {
+            tickStatus = m.seen ? `<span class="tick-icon tick-seen">✓✓</span>` : `<span class="tick-icon">✓</span>`;
+          }
+
           const div = document.createElement('div');
           div.className = `msg ${m.senderUid === currentUser.uid ? 'me' : 'them'}`;
-          div.innerText = m.text;
+          div.innerHTML = `
+            <div>${m.text}</div>
+            <div class="msg-meta">
+              <span>${timeStr}</span>
+              ${tickStatus}
+            </div>
+          `;
           box.appendChild(div);
         });
         box.scrollTop = box.scrollHeight;
       });
   }
 
-   function sendMessage() {
+  function sendMessage() {
     if (!selectedUser) return alert("အဆက်အသွယ်များထဲမှ လူတစ်ဦးကို အရင်ရွေးချယ်ပါ");
     const input = document.getElementById('msgInput');
     if (!input.value.trim()) return;
@@ -434,6 +497,7 @@
       senderUid: currentUser.uid,
       senderEmail: currentUser.email,
       receiverUid: selectedUser.uid,
+      seen: false,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     }).then(() => input.value = '');
   }
@@ -462,7 +526,7 @@
     }, 3000);
   }
 
-  // --- WebRTC Core Voice/Video Calling System ---
+  // --- WebRTC Voice/Video Call Functions ---
   async function startCall(type) {
     if (!selectedUser) return alert("ဖုန်းခေါ်ဆိုရန် အဆက်အသွယ် ရွေးချယ်ပါ");
     currentCallType = type;
@@ -475,6 +539,7 @@
     document.getElementById('callStatusText').innerText = "ဖုန်းခေါ်ဆိုနေပါသည်...";
     document.getElementById('btnAnswerCall').classList.add('hidden');
 
+    resetControlHideTimer();
     startRingtoneSound();
 
     localStream = await navigator.mediaDevices.getUserMedia({ 
@@ -551,6 +616,7 @@
             document.getElementById('callUserTitle').innerText = data.callerEmail;
             document.getElementById('callStatusText').innerText = `${data.callType === 'video' ? 'Video' : 'Audio'} Call ဝင်လာပါသည်...`;
 
+            resetControlHideTimer();
             startHardwareFlashlight();
             startRingtoneSound();
 
@@ -566,7 +632,7 @@
 
   async function answerCall() {
     stopHardwareFlashlight();
-    stopRingtoneSound(); // Ensure ringtone immediately stops
+    stopRingtoneSound();
     
     document.getElementById('btnAnswerCall').classList.add('hidden');
 
@@ -619,6 +685,7 @@
     });
 
     document.getElementById('callStatusText').innerText = "စကားပြောနေပါသည်";
+    resetControlHideTimer();
   }
 
   function hangUpCall(notifyRemote = true) {
@@ -641,6 +708,8 @@
     remoteStream = null;
     peerConnection = null;
     currentCallDocId = null;
+
+    if (hideControlsTimeout) clearTimeout(hideControlsTimeout);
 
     document.getElementById('callOverlay').classList.add('hidden');
   }
