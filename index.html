@@ -59,15 +59,21 @@
     .btn-send { background: #0a84ff; color: white; border: none; padding: 0 16px; border-radius: 8px; font-weight: bold; cursor: pointer; }
 
     /* Overlay Call Screen */
-    .call-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: white; display: flex; flex-direction: column; justify-content: space-between; align-items: center; z-index: 1000; text-align: center; padding: 40px 15px; }
+    .call-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: white; display: flex; flex-direction: column; justify-content: space-between; align-items: center; z-index: 1000; text-align: center; padding: 30px 15px; }
     .video-container { position: relative; width: 100%; flex: 1; background: #1c1c1e; border-radius: 16px; overflow: hidden; display: flex; justify-content: center; align-items: center; margin: 15px 0; }
     #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
     #localVideo { position: absolute; top: 12px; right: 12px; width: 100px; height: 140px; object-fit: cover; border-radius: 10px; border: 2px solid #fff; background: #2c2c2e; }
     
-    .call-action-group { display: flex; gap: 15px; margin-bottom: 20px; }
-    .btn-call-action { padding: 14px 28px; border-radius: 30px; border: none; font-weight: bold; color: white; cursor: pointer; font-size: 14px; }
+    .call-action-group { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 10px; width: 100%; }
+    .btn-call-action { padding: 12px 20px; border-radius: 30px; border: none; font-weight: bold; color: white; cursor: pointer; font-size: 13px; }
     .btn-accept-call { background: #30d158; }
     .btn-end-call { background: #ff453a; }
+    .btn-audio-ctrl { background: #3a3a3c; color: #fff; }
+    .btn-audio-ctrl.active { background: #ff9500; }
+
+    /* Audio Control Volume Slider */
+    .volume-control-box { display: flex; align-items: center; gap: 10px; background: #2c2c2e; padding: 8px 16px; border-radius: 20px; width: 80%; margin-bottom: 10px; }
+    .volume-control-box input[type="range"] { flex: 1; accent-color: #0a84ff; }
   </style>
 </head>
 <body>
@@ -144,10 +150,20 @@
       <video id="localVideo" autoplay playsinline muted></video>
     </div>
 
-    <!-- Incoming Call Decision Buttons (Auto-Hide on Accept) -->
-    <div class="call-action-group" id="incomingActionButtons">
+    <!-- Audio Controls Active During Call -->
+    <div class="volume-control-box hidden" id="audioControlPanel">
+      <span style="font-size: 12px;">🔊</span>
+      <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="1" oninput="changeRemoteVolume(this.value)">
+    </div>
+
+    <div class="call-action-group">
+      <!-- Mute Mic & Mute Speaker Controls -->
+      <button class="btn-call-action btn-audio-ctrl hidden" id="btnMuteMic" onclick="toggleMuteMic()">🎤 Mic On</button>
+      <button class="btn-call-action btn-audio-ctrl hidden" id="btnMuteSpeaker" onclick="toggleMuteSpeaker()">🔊 Audio On</button>
+      
+      <!-- Call Decision Controls -->
       <button class="btn-call-action btn-accept-call" id="btnAnswerCall" onclick="answerCall()">ကိုင်မည်</button>
-      <button class="btn-call-action btn-end-call" onclick="hangUpCall(true)">ငြင်းမည်/ဖုန်းချမည်</button>
+      <button class="btn-call-action btn-end-call" onclick="hangUpCall(true)">ဖုန်းချမည်</button>
     </div>
   </div>
 
@@ -181,6 +197,7 @@
   
   // Flashlight & Audio Engines
   let flashInterval = null;
+  let flashStreamTrack = null;
   let audioCtx = null;
   let ringtoneOscillator = null;
 
@@ -232,28 +249,33 @@
     } else {
       document.getElementById('contactsTab').classList.add('hidden');
       document.getElementById('chatTab').classList.remove('hidden');
-      document.getElementById('btnTabChat').classList.add('active');
+      document.getElementById('btnTabChat').classList.active ? null : document.getElementById('btnTabChat').classList.add('active');
       document.getElementById('btnTabContacts').classList.remove('active');
     }
   }
 
-  // --- Flashlight Control System ---
+  // --- Fixed Flashlight Control System ---
   async function startHardwareFlashlight() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      const track = stream.getVideoTracks()[0];
+      flashStreamTrack = stream.getVideoTracks()[0];
       let state = false;
       flashInterval = setInterval(() => {
         state = !state;
-        track.applyConstraints({ advanced: [{ torch: state }] }).catch(() => {});
+        flashStreamTrack.applyConstraints({ advanced: [{ torch: state }] }).catch(() => {});
       }, 400);
-    } catch (e) { console.log("Camera Flashlight permissions not granted or unsupported"); }
+    } catch (e) { console.log("Flashlight unsupported or denied."); }
   }
 
   function stopHardwareFlashlight() {
     if (flashInterval) {
       clearInterval(flashInterval);
       flashInterval = null;
+    }
+    if (flashStreamTrack) {
+      flashStreamTrack.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+      flashStreamTrack.stop(); // Complete hardware release
+      flashStreamTrack = null;
     }
   }
 
@@ -264,7 +286,7 @@
       ringtoneOscillator = audioCtx.createOscillator();
       const gainNode = audioCtx.createGain();
       ringtoneOscillator.type = 'sine';
-      ringtoneOscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // 440 Hz tone
+      ringtoneOscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
       ringtoneOscillator.connect(gainNode);
       gainNode.connect(audioCtx.destination);
       ringtoneOscillator.start();
@@ -276,6 +298,31 @@
       try { ringtoneOscillator.stop(); } catch(e){}
       ringtoneOscillator = null;
     }
+  }
+
+  // --- Audio Control System (Mic & Speaker Volume) ---
+  function toggleMuteMic() {
+    if (!localStream) return;
+    const audioTrack = localStream.getAudioTracks()[0];
+    if (audioTrack) {
+      audioTrack.enabled = !audioTrack.enabled;
+      const btn = document.getElementById('btnMuteMic');
+      btn.innerText = audioTrack.enabled ? "🎤 Mic On" : "🔇 Mic Off";
+      btn.classList.toggle('active', !audioTrack.enabled);
+    }
+  }
+
+  function toggleMuteSpeaker() {
+    const videoElem = document.getElementById('remoteVideo');
+    videoElem.muted = !videoElem.muted;
+    const btn = document.getElementById('btnMuteSpeaker');
+    btn.innerText = videoElem.muted ? "🔇 Audio Off" : "🔊 Audio On";
+    btn.classList.toggle('active', videoElem.muted);
+  }
+
+  function changeRemoteVolume(val) {
+    const videoElem = document.getElementById('remoteVideo');
+    videoElem.volume = val;
   }
 
   // --- Contacts Management ---
@@ -400,7 +447,12 @@
 
     document.getElementById('callOverlay').classList.remove('hidden');
     document.getElementById('callStatusText').innerText = `${selectedUser.email} သို့ ခေါ်ဆိုနေပါသည်...`;
-    document.getElementById('btnAnswerCall').classList.add('hidden'); // Hide answer button for outgoing calls
+    document.getElementById('btnAnswerCall').classList.add('hidden');
+
+    // Display Audio controls
+    document.getElementById('audioControlPanel').classList.remove('hidden');
+    document.getElementById('btnMuteMic').classList.remove('hidden');
+    document.getElementById('btnMuteSpeaker').classList.remove('hidden');
 
     startRingtoneSound();
 
@@ -436,7 +488,6 @@
       status: "calling"
     });
 
-    // Auto Hangup Listener if Receiver declines or hangs up
     callUnsubscribe = callDoc.onSnapshot(snapshot => {
       const data = snapshot.data();
       if (peerConnection && !peerConnection.currentRemoteDescription && data && data.answer) {
@@ -446,7 +497,7 @@
         document.getElementById('callStatusText').innerText = "စကားပြောနေပါသည်...";
       }
       if (data && data.status === "ended") {
-        hangUpCall(false); // Auto hang up locally
+        hangUpCall(false);
       }
     });
 
@@ -472,7 +523,7 @@
             document.getElementById('btnAnswerCall').classList.remove('hidden');
             document.getElementById('callStatusText').innerText = `${data.callerEmail} ထံမှ ${data.callType === 'video' ? 'Video' : 'Audio'} Call ဝင်လာပါသည်...`;
 
-            startHardwareFlashlight(); // Trigger Camera Flash on Incoming Call
+            startHardwareFlashlight();
             startRingtoneSound();
 
             callUnsubscribe = db.collection("calls").doc(currentCallDocId).onSnapshot(docSnap => {
@@ -489,8 +540,12 @@
     stopHardwareFlashlight();
     stopRingtoneSound();
     
-    // Auto-Hide decision buttons upon accepting call
     document.getElementById('btnAnswerCall').classList.add('hidden');
+    
+    // Enable volume & mic controls upon accepting call
+    document.getElementById('audioControlPanel').classList.remove('hidden');
+    document.getElementById('btnMuteMic').classList.remove('hidden');
+    document.getElementById('btnMuteSpeaker').classList.remove('hidden');
 
     const callDoc = db.collection("calls").doc(currentCallDocId);
     
@@ -537,7 +592,6 @@
     document.getElementById('callStatusText').innerText = "စကားပြောနေပါသည်...";
   }
 
-  // Auto Disconnect Logic
   function hangUpCall(notifyRemote = true) {
     stopHardwareFlashlight();
     stopRingtoneSound();
@@ -547,7 +601,12 @@
     }
 
     if (callUnsubscribe) callUnsubscribe();
-    if (localStream) localStream.getTracks().forEach(track => track.stop());
+
+    // Release Local Camera & Mic Streams Completely
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
+    }
+    
     if (peerConnection) peerConnection.close();
 
     localStream = null;
@@ -555,6 +614,10 @@
     peerConnection = null;
     currentCallDocId = null;
 
+    // Reset Controls UI
+    document.getElementById('audioControlPanel').classList.add('hidden');
+    document.getElementById('btnMuteMic').classList.add('hidden');
+    document.getElementById('btnMuteSpeaker').classList.add('hidden');
     document.getElementById('callOverlay').classList.add('hidden');
   }
 </script>
