@@ -5,10 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Phone Call & Private Chat App</title>
 
-  <!-- Firebase Web SDK v10.8.0 -->
+  <!-- Firebase Web SDK v10.8.0 (Compat Mode) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
+
+  <!-- SendBird Calls / Chat SDK (If integrated) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sendbird/3.1.2/SendBird.min.js"></script>
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -17,772 +21,347 @@
     .app-card { background: #ffffff; width: 100%; max-width: 420px; height: 92vh; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; position: relative; }
     .hidden { display: none !important; }
 
-    /* Smart Top Floating Notification Banner */
+    /* Flashlight Screen Effect */
+    .screen-flash-active {
+      animation: flashStrobe 0.5s infinite alternate;
+    }
+    @keyframes flashStrobe {
+      0% { box-shadow: inset 0 0 0px #ff0000; background-color: rgba(255,255,255,1); }
+      100% { box-shadow: inset 0 0 50px #007aff; background-color: rgba(0,122,255,0.2); }
+    }
+
+    /* Floating Notification Banner */
     .top-notification-banner {
-      position: absolute; top: 12px; left: 4%; width: 92%; background: rgba(20, 20, 20, 0.92);
+      position: absolute; top: 12px; left: 4%; width: 92%; background: rgba(20, 20, 20, 0.95);
       color: #ffffff; padding: 12px 16px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);
       z-index: 400; display: flex; align-items: center; justify-content: space-between;
       backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15);
-      animation: slideInDown 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      cursor: pointer;
-    }
-    .top-notification-banner.slide-out {
-      animation: slideOutUp 0.4s ease-in forwards;
+      animation: slideInDown 0.4s ease-out; cursor: pointer;
     }
 
     @keyframes slideInDown {
       from { transform: translateY(-80px); opacity: 0; }
       to { transform: translateY(0); opacity: 1; }
     }
-    @keyframes slideOutUp {
-      from { transform: translateY(0); opacity: 1; }
-      to { transform: translateY(-80px); opacity: 0; }
-    }
 
     .notif-body { display: flex; flex-direction: column; width: 78%; overflow: hidden; }
     .notif-title { font-size: 13px; font-weight: bold; color: #34c759; margin-bottom: 2px; display: flex; align-items: center; gap: 6px; }
     .notif-ticker { white-space: nowrap; font-size: 13px; color: #eee; overflow: hidden; text-overflow: ellipsis; }
-    
-    /* Screen Edge Flashlight Animation */
-    .flash-strobe {
-      animation: edgeFlash 0.6s 3;
-    }
-    @keyframes edgeFlash {
-      0% { box-shadow: inset 0 0 0px #007aff; }
-      50% { box-shadow: inset 0 0 35px #007aff, 0 0 25px #007aff; }
-      100% { box-shadow: inset 0 0 0px #007aff; }
-    }
 
-    /* Auth Screen */
-    .auth-box { padding: 30px 20px; display: flex; flex-direction: column; gap: 15px; justify-content: center; height: 100%; text-align: center; }
-    .btn-google { background: #4285f4; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 15px; }
+    /* Auth Styling */
+    .auth-box { padding: 25px 20px; display: flex; flex-direction: column; gap: 12px; justify-content: center; height: 100%; text-align: center; overflow-y: auto; }
+    .input-auth { padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; width: 100%; }
+    .btn-auth { background: #007aff; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; margin-top: 5px; }
+    .btn-google { background: #4285f4; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; }
 
-    /* App Header (ပြင်ဆင်ထားသော နေရာ) */
+    /* App Layout */
     .app-header { background: #007aff; color: white; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
-    .header-user-container { display: flex; align-items: center; gap: 8px; }
-    .header-user { font-size: 13px; font-weight: 600; white-space: nowrap; }
-    .btn-logout { background: rgba(255, 59, 48, 0.9); color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: bold; }
+    .header-user { font-size: 13px; font-weight: 600; }
+    .btn-logout { background: rgba(255, 59, 48, 0.9); color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; }
 
-    /* Header Call Buttons */
-    .header-call-btns { display: flex; gap: 6px; align-items: center; }
-    .btn-call { background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 12px; cursor: pointer; font-weight: bold; font-size: 11px; }
-    .btn-video { background: #ffffff; color: #007aff; border: none; padding: 5px 10px; border-radius: 12px; cursor: pointer; font-weight: bold; font-size: 11px; }
-
-    /* User Directory */
     .users-bar { background: #f8f9fa; border-bottom: 1px solid #e9ecef; padding: 8px 10px; }
-    .users-bar label { font-size: 11px; color: #6c757d; font-weight: bold; display: block; margin-bottom: 4px; }
     .user-list { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 3px; }
     .user-chip { background: #ffffff; border: 1px solid #ced4da; padding: 4px 10px; border-radius: 16px; font-size: 12px; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
     .user-chip.active { background: #007aff; color: white; border-color: #007aff; }
-    .online-dot { width: 7px; height: 7px; background: #28a745; border-radius: 50%; }
 
-    /* Target User Header */
-    .target-header { background: #f1f3f5; padding: 8px 12px; border-bottom: 1px solid #dee2e6; font-size: 12px; font-weight: bold; }
-
-    /* Chat Area */
     .chat-box { flex: 1; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #fafafa; }
-    .msg { padding: 8px 12px; border-radius: 12px; font-size: 13px; max-width: 80%; word-break: break-word; line-height: 1.4; }
-    .msg.me { background: #007aff; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
-    .msg.them { background: #e9ecef; color: #212529; align-self: flex-start; border-bottom-left-radius: 2px; }
+    .msg { padding: 8px 12px; border-radius: 12px; font-size: 13px; max-width: 80%; word-break: break-word; }
+    .msg.me { background: #007aff; color: white; align-self: flex-end; }
+    .msg.them { background: #e9ecef; color: #212529; align-self: flex-start; }
 
-    /* Input Area */
-    .input-bar { padding: 8px; background: #fff; border-top: 1px solid #e9ecef; display: flex; gap: 6px; align-items: flex-end; }
-    .input-bar textarea { flex: 1; padding: 8px; border: 1px solid #ced4da; border-radius: 8px; outline: none; font-size: 13px; resize: none; height: 42px; font-family: inherit; }
-    .btn-send { background: #007aff; color: white; border: none; padding: 0 14px; border-radius: 8px; font-weight: bold; cursor: pointer; height: 42px; font-size: 13px; }
+    .input-bar { padding: 8px; background: #fff; border-top: 1px solid #e9ecef; display: flex; gap: 6px; }
+    .input-bar textarea { flex: 1; padding: 8px; border: 1px solid #ced4da; border-radius: 8px; font-size: 13px; resize: none; height: 42px; }
+    .btn-send { background: #007aff; color: white; border: none; padding: 0 14px; border-radius: 8px; font-weight: bold; cursor: pointer; }
 
-    /* Call Overlay & Video Layout */
-    .call-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); color: white; display: flex; flex-direction: column; justify-content: space-between; align-items: center; z-index: 100; text-align: center; padding: 30px 15px; user-select: none; }
-    
-    .video-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; }
-    #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
-    #localVideo { position: absolute; top: 20px; right: 20px; width: 105px; height: 145px; object-fit: cover; border-radius: 12px; border: 2px solid rgba(255,255,255,0.7); z-index: 10; background: #111; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
-
-    .call-overlay.flashing { animation: pulseBg 0.8s infinite alternate; }
-    @keyframes pulseBg {
-      0% { background: rgba(0, 20, 50, 0.95); box-shadow: inset 0 0 50px #007aff; }
-      100% { background: rgba(80, 0, 0, 0.95); box-shadow: inset 0 0 50px #ff3b30; }
-    }
-
-    .call-ui-layer { transition: opacity 0.3s ease, transform 0.3s ease; z-index: 20; width: 100%; display: flex; flex-direction: column; align-items: center; }
-    .call-ui-layer.autohide { opacity: 0; pointer-events: none; transform: translateY(10px); }
-
-    .call-header-info { margin-top: 10px; background: rgba(0,0,0,0.4); padding: 8px 18px; border-radius: 20px; backdrop-filter: blur(5px); }
-    .call-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-bottom: 10px; }
-    
-    .btn-accept { background: #28a745; color: white; border: none; padding: 12px 28px; border-radius: 25px; font-weight: bold; cursor: pointer; font-size: 15px; box-shadow: 0 4px 12px rgba(40,167,69,0.4); }
-    .btn-reject { background: #dc3545; color: white; border: none; padding: 12px 28px; border-radius: 25px; font-weight: bold; cursor: pointer; font-size: 15px; box-shadow: 0 4px 12px rgba(220,53,69,0.4); }
-    
-    .ctrl-bar { background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); padding: 8px 12px; border-radius: 25px; display: flex; gap: 8px; margin-bottom: 12px; }
-    .btn-ctrl { background: rgba(255,255,255,0.2); color: white; border: none; padding: 10px 14px; border-radius: 50%; font-size: 14px; cursor: pointer; width: 42px; height: 42px; display: flex; justify-content: center; align-items: center; }
-    .btn-ctrl.off { background: #e63946; }
-
-    .volume-box { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: rgba(255,255,255,0.8); }
-    .volume-box input[type="range"] { width: 140px; accent-color: #007aff; cursor: pointer; }
+    /* Call Overlay */
+    .call-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.92); color: white; display: flex; flex-direction: column; justify-content: space-between; align-items: center; z-index: 100; text-align: center; padding: 30px 15px; }
+    .btn-accept { background: #28a745; color: white; border: none; padding: 12px 28px; border-radius: 25px; font-weight: bold; cursor: pointer; }
+    .btn-reject { background: #dc3545; color: white; border: none; padding: 12px 28px; border-radius: 25px; font-weight: bold; cursor: pointer; }
   </style>
 </head>
 <body>
 
 <div class="app-card" id="appCard">
 
-  <!-- Audio Elements -->
   <audio id="remoteAudio" autoplay playsinline></audio>
+  <div id="recaptcha-container"></div>
 
-  <!-- Top Floating Notification Banner -->
+  <!-- Banner Notification -->
   <div id="topBanner" class="top-notification-banner hidden" onclick="handleBannerClick()">
     <div class="notif-body">
-      <div class="notif-title">
-        <span id="notifIcon">💬</span>
-        <span id="notifSender">...</span>
-      </div>
+      <div class="notif-title"><span id="notifIcon">💬</span> <span id="notifSender">...</span></div>
       <div class="notif-ticker" id="notifText">...</div>
     </div>
     <span style="font-size: 11px; background: rgba(255,255,255,0.2); padding: 4px 8px; border-radius: 10px;">ဖွင့်ရန်</span>
   </div>
 
-  <!-- 1. Auth Screen -->
+  <!-- 1. Auth Section -->
   <div id="authSection" class="auth-box">
-    <h2>ဖုန်းခေါ်ဆိုမှု နှင့် စာပို့စနစ်</h2>
-    <p style="font-size: 13px; color: #666;">စတင်အသုံးပြုရန် အကောင့်ဝင်ပါ</p>
+    <h2>အကောင့်ဝင်ရောက်ရန်</h2>
+    
+    <!-- Email Login -->
+    <input type="email" id="emailInput" class="input-auth" placeholder="အီးမေးလ် ထည့်ပါ">
+    <input type="password" id="passInput" class="input-auth" placeholder="စကားဝှက် ထည့်ပါ">
+    <button class="btn-auth" onclick="loginWithEmail()">Email ဖြင့် ဝင်မည် / အကောင့်ဖွင့်မည်</button>
+
+    <hr style="margin: 10px 0; border: 0.5px solid #eee;">
+
+    <!-- Phone Login -->
+    <input type="text" id="phoneInput" class="input-auth" placeholder="+959xxxxxxxxx">
+    <button class="btn-auth" style="background: #34c759;" onclick="sendOTP()">ဖုန်းနံပါတ်သို့ OTP ပို့မည်</button>
+    
+    <div id="otpSection" class="hidden" style="margin-top: 5px;">
+      <input type="text" id="otpInput" class="input-auth" placeholder="OTP ၆ လုံး ထည့်ပါ">
+      <button class="btn-auth" style="background: #5856d6;" onclick="verifyOTP()">OTP အတည်ပြုမည်</button>
+    </div>
+
+    <hr style="margin: 10px 0; border: 0.5px solid #eee;">
+
     <button class="btn-google" onclick="loginWithGoogle()">Google Account ဖြင့် ဝင်မည်</button>
   </div>
 
-  <!-- 2. Main App Screen -->
+  <!-- 2. Main App Section -->
   <div id="appSection" class="hidden" style="display: flex; flex-direction: column; height: 100%;">
-    
-    <!-- Top Header Bar with Call Buttons and User Info -->
     <div class="app-header">
-      <div class="header-user-container">
-        <div class="header-user">မိမိ: <span id="userNameDisplay">...</span></div>
+      <div class="header-user">မိမိ: <span id="userNameDisplay">...</span></div>
+      <div>
+        <button id="callBtn" class="btn-logout" style="background:#28a745;" onclick="startCall('audio')">📞 Call</button>
         <button class="btn-logout" onclick="confirmLogout()">ထွက်မည်</button>
       </div>
-      
-      <div class="header-call-btns">
-        <button id="callBtn" class="btn-call hidden" onclick="startCall('audio')">📞 Audio</button>
-        <button id="videoBtn" class="btn-video hidden" onclick="startCall('video')">📹 Video</button>
-      </div>
     </div>
 
-    <!-- Active Online Users -->
     <div class="users-bar">
-      <label>အွန်လိုင်းရောက်နေသူများ (စာပြောရန် နှိပ်ပါ):</label>
-      <div class="user-list" id="usersList">
-        <span style="font-size: 12px; color: #888;">အခြားသူများ မရှိသေးပါ</span>
-      </div>
+      <div class="user-list" id="usersList"></div>
     </div>
 
-    <!-- Chat Target Header -->
-    <div class="target-header">
-      စကားပြောနေသူ: <span id="targetUserName" style="color:#007aff;">မရွေးချယ်ရသေးပါ</span>
-    </div>
+    <div class="chat-box" id="chatBox"></div>
 
-    <!-- Chat View -->
-    <div class="chat-box" id="chatBox">
-      <p style="text-align: center; color: #888; font-size: 13px; margin-top: 20px;">
-        စကားပြောလိုသည့် သူ၏ နာမည်ကို အပေါ်တွင် ရွေးချယ်ပေးပါ
-      </p>
-    </div>
-
-    <!-- Input Bar -->
     <div class="input-bar">
       <textarea id="msgInput" placeholder="စာရိုက်ပါ..."></textarea>
       <button class="btn-send" onclick="sendMessage()">ပို့မည်</button>
     </div>
   </div>
 
-  <!-- 3. Call Incoming/Outgoing Overlay -->
-  <div id="callOverlay" class="call-overlay hidden" onclick="toggleCallUIOnTap()">
-    
-    <div id="videoContainer" class="video-container hidden">
-      <video id="remoteVideo" autoplay playsinline></video>
-      <video id="localVideo" autoplay playsinline muted></video>
+  <!-- 3. Call Overlay -->
+  <div id="callOverlay" class="call-overlay hidden">
+    <h3 id="callStatusText">ဖုန်းခေါ်ဆိုနေပါသည်...</h3>
+    <p id="callerNameText"></p>
+    <div id="callActions">
+      <button class="btn-reject" onclick="endCall()">ဖုန်းချမည်</button>
     </div>
-
-    <div id="topUiLayer" class="call-ui-layer">
-      <div class="call-header-info">
-        <h3 id="callStatusText" style="font-size: 16px;">ဖုန်းခေါ်ဆိုနေပါသည်...</h3>
-        <p id="callerNameText" style="font-size: 13px; color: #ddd; margin-top:2px;"></p>
-      </div>
-    </div>
-    
-    <div id="bottomUiLayer" class="call-ui-layer">
-      <div class="ctrl-bar hidden" id="audioControls">
-        <button id="toggleMicBtn" class="btn-ctrl" onclick="event.stopPropagation(); toggleMic();" title="Mic">🎙️</button>
-        <button id="toggleAudioBtn" class="btn-ctrl" onclick="event.stopPropagation(); toggleAudio();" title="Audio">🔊</button>
-        <button id="toggleCamBtn" class="btn-ctrl hidden" onclick="event.stopPropagation(); toggleCam();" title="Cam">📹</button>
-        <button id="toggleTorchBtn" class="btn-ctrl hidden" onclick="event.stopPropagation(); toggleTorch();" title="Flash">🔦</button>
-      </div>
-
-      <div class="volume-box hidden" id="volumeContainer" onclick="event.stopPropagation();">
-        <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1" oninput="changeVolume(this.value)">
-      </div>
-
-      <div class="call-actions" id="callActions" onclick="event.stopPropagation();">
-        <button class="btn-reject" onclick="endCall()">ဖုန်းချမည်</button>
-      </div>
-    </div>
-
   </div>
 
 </div>
 
 <script>
+  // ထည့်သွင်းထားသော တရားဝင် API Key များ
+  const SENDBIRD_APP_ID = "VowcxoA6jriMLJ8YvcNI87nCu6gV2inBw34nTIuccnw";
+  
   const firebaseConfig = {
-    apiKey: "AIzaSyD_qwmzPYB_W0knSobETMGKKH3YhtVIaow",
-    authDomain: "phone-call-20830.firebaseapp.com",
-    projectId: "phone-call-20830",
-    storageBucket: "phone-call-20830.firebasestorage.app",
-    messagingSenderId: "879161246559",
-    appId: "1:879161246559:android:72fcdf7063f8c5c882acea"
+    apiKey: "AIzaSyCxM61dhkI992k0SZZQNRimqEIp5DM4PaE",
+    authDomain: "phone-call-bcb5d.firebaseapp.com",
+    projectId: "phone-call-bcb5d",
+    storageBucket: "phone-call-bcb5d.firebasestorage.app",
+    messagingSenderId: "479656547247",
+    appId: "1:479656547247:web:d6ae8a8903282e3856955a",
+    measurementId: "G-TS8HYPV8VE"
   };
 
   if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   const db = firebase.firestore();
 
+  // SendBird Init (If SendBird SDK is loaded)
+  let sb = null;
+  if (typeof SendBird !== 'undefined') {
+    sb = new SendBird({ appId: SENDBIRD_APP_ID });
+  }
+
   let currentUser = null;
-  let selectedUser = null; 
-  let currentCallId = null;
-  let activeChatUnsubscribe = null;
-  let notifTargetUser = null;
-  let bannerTimeout = null;
-
-  let peerConnection = null;
-  let localStream = null;
-  let remoteStream = null;
-  let callStateUnsubscribe = null;
-  let isMicMuted = false;
-  let isAudioMuted = false;
-  let isCamOff = false;
-  let isTorchOn = false;
-  let currentCallType = 'audio';
-  let uiHideTimeout = null;
-  let isCallConnected = false;
-
+  let selectedUser = null;
+  let confirmationResultObj = null;
   let audioCtx = null;
-  let ringtoneInterval = null;
 
-  const rtcConfig = {
-    iceServers: [{ urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }]
+  window.onload = () => {
+    window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+      'size': 'invisible'
+    });
   };
-
-  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
   auth.onAuthStateChanged(user => {
     if (user) {
       currentUser = user;
-      onLoginSuccess(user);
+      document.getElementById('authSection').classList.add('hidden');
+      document.getElementById('appSection').classList.remove('hidden');
+      document.getElementById('userNameDisplay').innerText = user.displayName || user.email || user.phoneNumber;
+
+      // Connect to SendBird User Session
+      if (sb) {
+        sb.connect(user.uid, (sbUser, err) => {
+          if (!err) {
+            sb.updateCurrentUserInfo(user.displayName || user.email || user.phoneNumber, null, null);
+          }
+        });
+      }
+
+      db.collection("users").doc(user.uid).set({
+        name: user.displayName || user.email || user.phoneNumber,
+        uid: user.uid,
+        online: true
+      }, { merge: true });
+
+      listenUsers();
+      listenIncomingCalls();
+      listenMessages();
     } else {
-      currentUser = null;
       document.getElementById('authSection').classList.remove('hidden');
       document.getElementById('appSection').classList.add('hidden');
     }
   });
 
+  // Auth Functions
   function loginWithGoogle() {
     const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).catch(err => alert("Login Error: " + err.message));
+    auth.signInWithPopup(provider).catch(e => alert(e.message));
   }
 
-  function confirmLogout() {
-    if (confirm("အကောင့်မှ ထွက်မှာ သေချာပါသလားဆရာ?")) {
-      if (currentUser) db.collection("users").doc(currentUser.uid).update({ online: false });
-      auth.signOut();
-    }
-  }
-
-  function onLoginSuccess(user) {
-    document.getElementById('authSection').classList.add('hidden');
-    document.getElementById('appSection').classList.remove('hidden');
-    document.getElementById('userNameDisplay').innerText = user.displayName || user.email;
-
-    db.collection("users").doc(user.uid).set({
-      name: user.displayName || user.email,
-      uid: user.uid,
-      online: true,
-      lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-
-    listenOnlineUsers();
-    listenIncomingCalls();
-    listenGlobalIncomingMessages();
-  }
-
-  function listenOnlineUsers() {
-    db.collection("users").onSnapshot(snapshot => {
-      const usersList = document.getElementById('usersList');
-      usersList.innerHTML = '';
-      let count = 0;
-
-      snapshot.forEach(doc => {
-        const u = doc.data();
-        if (u.uid !== currentUser.uid) {
-          count++;
-          const chip = document.createElement('div');
-          chip.className = `user-chip ${selectedUser && selectedUser.uid === u.uid ? 'active' : ''}`;
-          chip.innerHTML = `<span class="online-dot"></span> ${u.name}`;
-          chip.onclick = () => selectUserForChat(u);
-          usersList.appendChild(chip);
-        }
-      });
-
-      if (count === 0) {
-        usersList.innerHTML = '<span style="font-size: 12px; color: #888;">အခြားသူများ မရှိသေးပါ</span>';
-      }
+  function loginWithEmail() {
+    const email = document.getElementById('emailInput').value;
+    const pass = document.getElementById('passInput').value;
+    auth.signInWithEmailAndPassword(email, pass).catch(() => {
+      auth.createUserWithEmailAndPassword(email, pass).catch(e => alert(e.message));
     });
   }
 
-  function selectUserForChat(user) {
-    selectedUser = user;
-    document.getElementById('targetUserName').innerText = user.name;
-    document.getElementById('callBtn').classList.remove('hidden');
-    document.getElementById('videoBtn').classList.remove('hidden');
-    listenOnlineUsers();
-    loadPrivateMessages();
+  function sendOTP() {
+    const phoneNumber = document.getElementById('phoneInput').value;
+    const appVerifier = window.recaptchaVerifier;
+    auth.signInWithPhoneNumber(phoneNumber, appVerifier)
+      .then(result => {
+        confirmationResultObj = result;
+        document.getElementById('otpSection').classList.remove('hidden');
+        alert("OTP ပို့ပြီးပါပြီ။");
+      }).catch(e => alert(e.message));
   }
 
-  function loadPrivateMessages() {
-    if (!selectedUser) return;
-    if (activeChatUnsubscribe) activeChatUnsubscribe();
-
-    const chatRoomId = getChatRoomId(currentUser.uid, selectedUser.uid);
-
-    activeChatUnsubscribe = db.collection("chats").doc(chatRoomId).collection("messages")
-      .orderBy("timestamp", "asc")
-      .onSnapshot(snapshot => {
-        const chatBox = document.getElementById('chatBox');
-        chatBox.innerHTML = '';
-
-        if (snapshot.empty) {
-          chatBox.innerHTML = `<p style="text-align: center; color: #888; font-size: 13px; margin-top: 20px;">${selectedUser.name} နှင့် စာများ စတင်ပို့နိုင်ပါပြီ</p>`;
-          return;
-        }
-
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          const isMe = data.senderUid === currentUser.uid;
-          const div = document.createElement('div');
-          div.className = `msg ${isMe ? 'me' : 'them'}`;
-          div.innerText = data.text;
-          chatBox.appendChild(div);
-        });
-        chatBox.scrollTop = chatBox.scrollHeight;
-      });
+  function verifyOTP() {
+    const code = document.getElementById('otpInput').value;
+    confirmationResultObj.confirm(code).catch(e => alert("OTP မမှန်ပါ: " + e.message));
   }
 
-  function triggerScreenFlash() {
+  function confirmLogout() {
+    if (currentUser) db.collection("users").doc(currentUser.uid).update({ online: false });
+    if (sb) sb.disconnect();
+    auth.signOut();
+  }
+
+  // Strobe Notification & Beep Sound
+  function triggerStrobeNotification() {
     const appCard = document.getElementById('appCard');
-    appCard.classList.remove('flash-strobe');
-    void appCard.offsetWidth;
-    appCard.classList.add('flash-strobe');
-  }
-
-  function showTopBanner(icon, sender, text, userObject) {
-    notifTargetUser = userObject;
-    triggerScreenFlash();
-
-    const banner = document.getElementById('topBanner');
-    document.getElementById('notifIcon').innerText = icon;
-    document.getElementById('notifSender').innerText = sender;
-    document.getElementById('notifText').innerText = text;
-
-    banner.classList.remove('hidden', 'slide-out');
+    appCard.classList.add('screen-flash-active');
+    setTimeout(() => appCard.classList.remove('screen-flash-active'), 3000);
     
-    clearTimeout(bannerTimeout);
-    bannerTimeout = setTimeout(() => {
-      dismissBanner();
-    }, 5000);
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      osc.connect(audioCtx.destination);
+      osc.frequency.value = 800;
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.3);
+    } catch(e) {}
   }
 
-  function dismissBanner() {
-    const banner = document.getElementById('topBanner');
-    banner.classList.add('slide-out');
-    setTimeout(() => {
-      banner.classList.add('hidden');
-      banner.classList.remove('slide-out');
-    }, 400);
+  function listenUsers() {
+    db.collection("users").onSnapshot(snap => {
+      const list = document.getElementById('usersList');
+      list.innerHTML = '';
+      snap.forEach(doc => {
+        const u = doc.data();
+        if (u.uid !== currentUser.uid) {
+          const div = document.createElement('div');
+          div.className = `user-chip ${selectedUser && selectedUser.uid === u.uid ? 'active' : ''}`;
+          div.innerText = u.name;
+          div.onclick = () => { selectedUser = u; listenMessages(); };
+          list.appendChild(div);
+        }
+      });
+    });
   }
 
-  function handleBannerClick() {
-    dismissBanner();
-    if (notifTargetUser) {
-      selectUserForChat(notifTargetUser);
-    }
-  }
-
-  function listenGlobalIncomingMessages() {
-    db.collectionGroup("messages")
-      .where("receiverUid", "==", currentUser.uid)
-      .orderBy("timestamp", "desc")
-      .limit(1)
-      .onSnapshot(snapshot => {
-        snapshot.docChanges().forEach(change => {
-          if (change.type === "added") {
-            const msgData = change.doc.data();
-            if (!selectedUser || selectedUser.uid !== msgData.senderUid) {
-              db.collection("users").doc(msgData.senderUid).get().then(doc => {
-                if (doc.exists) {
-                  const sender = doc.data();
-                  showTopBanner("💬", sender.name, msgData.text, sender);
-                }
-              });
-            }
-          }
+  function listenMessages() {
+    if (!selectedUser) return;
+    const roomId = currentUser.uid < selectedUser.uid ? `${currentUser.uid}_${selectedUser.uid}` : `${selectedUser.uid}_${currentUser.uid}`;
+    
+    db.collection("chats").doc(roomId).collection("messages").orderBy("timestamp", "asc")
+      .onSnapshot(snap => {
+        const box = document.getElementById('chatBox');
+        box.innerHTML = '';
+        snap.forEach(doc => {
+          const m = doc.data();
+          const div = document.createElement('div');
+          div.className = `msg ${m.senderUid === currentUser.uid ? 'me' : 'them'}`;
+          div.innerText = m.text;
+          box.appendChild(div);
         });
+        box.scrollTop = box.scrollHeight;
       });
   }
 
   function sendMessage() {
-    if (!selectedUser) return alert("ကျေးဇူးပြု၍ စာပို့လိုသူကို အရင်ရွေးချယ်ပါဆရာ");
-
+    if (!selectedUser) return alert("လူရွေးပါ");
     const input = document.getElementById('msgInput');
-    const text = input.value.trim();
-    if (!text) return;
-
-    const chatRoomId = getChatRoomId(currentUser.uid, selectedUser.uid);
-
-    db.collection("chats").doc(chatRoomId).collection("messages").add({
-      text: text,
+    if (!input.value.trim()) return;
+    
+    const roomId = currentUser.uid < selectedUser.uid ? `${currentUser.uid}_${selectedUser.uid}` : `${selectedUser.uid}_${currentUser.uid}`;
+    db.collection("chats").doc(roomId).collection("messages").add({
+      text: input.value,
       senderUid: currentUser.uid,
-      receiverUid: selectedUser.uid,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    }).then(() => { input.value = ''; });
-  }
-
-  function getChatRoomId(uid1, uid2) {
-    return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
-  }
-
-  function playTone(freq1, freq2, duration) {
-    try {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-
-      const osc1 = audioCtx.createOscillator();
-      const osc2 = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-
-      osc1.type = 'sine';
-      osc2.type = 'triangle';
-      osc1.frequency.value = freq1;
-      osc2.frequency.value = freq2;
-
-      gainNode.gain.setValueAtTime(0.35, audioCtx.currentTime);
-
-      osc1.connect(gainNode); osc2.connect(gainNode); gainNode.connect(audioCtx.destination);
-      osc1.start(); osc2.start();
-      setTimeout(() => { osc1.stop(); osc2.stop(); }, duration);
-    } catch (e) {}
-  }
-
-  function startRingtone(type) {
-    stopRingtone();
-    document.getElementById('callOverlay').classList.add('flashing');
-
-    if (type === 'outgoing') {
-      playTone(440, 480, 2000);
-      ringtoneInterval = setInterval(() => { playTone(440, 480, 2000); }, 3500);
-    } else if (type === 'incoming') {
-      playTone(850, 950, 1000);
-      ringtoneInterval = setInterval(() => { playTone(850, 950, 1000); }, 2200);
-    }
-  }
-
-  function stopRingtone() {
-    if (ringtoneInterval) { clearInterval(ringtoneInterval); ringtoneInterval = null; }
-    document.getElementById('callOverlay').classList.remove('flashing');
-  }
-
-  function showCallUI() {
-    document.getElementById('topUiLayer').classList.remove('autohide');
-    document.getElementById('bottomUiLayer').classList.remove('autohide');
-
-    if (isCallConnected && currentCallType === 'video') {
-      clearTimeout(uiHideTimeout);
-      uiHideTimeout = setTimeout(() => {
-        document.getElementById('topUiLayer').classList.add('autohide');
-        document.getElementById('bottomUiLayer').classList.add('autohide');
-      }, 3500);
-    }
-  }
-
-  function toggleCallUIOnTap() {
-    if (!isCallConnected || currentCallType !== 'video') return;
-    const top = document.getElementById('topUiLayer');
-    if (top.classList.contains('autohide')) {
-      showCallUI();
-    } else {
-      top.classList.add('autohide');
-      document.getElementById('bottomUiLayer').classList.add('autohide');
-    }
-  }
-
-  async function initPeerConnection(callDocRef, isVideo = false) {
-    peerConnection = new RTCPeerConnection(rtcConfig);
-
-    try {
-      localStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
-        video: isVideo ? { facingMode: "user" } : false
-      });
-
-      localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-      if (isVideo) {
-        document.getElementById('videoContainer').classList.remove('hidden');
-        document.getElementById('localVideo').srcObject = localStream;
-        document.getElementById('toggleCamBtn').classList.remove('hidden');
-        document.getElementById('toggleTorchBtn').classList.remove('hidden');
-      }
-    } catch (err) {
-      alert("မိုက်ခရိုဖုန်း သို့မဟုတ် ကင်မရာ အသုံးပြုခွင့် လိုအပ်ပါသည်။");
-      endCall();
-      return null;
-    }
-
-    remoteStream = new MediaStream();
-    peerConnection.ontrack = (event) => {
-      event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
-      
-      if (isVideo) {
-        document.getElementById('remoteVideo').srcObject = remoteStream;
-      }
-      const remoteAudio = document.getElementById('remoteAudio');
-      remoteAudio.srcObject = remoteStream;
-      remoteAudio.volume = document.getElementById('volumeSlider').value;
-      remoteAudio.play().catch(e => {});
-    };
-
-    return peerConnection;
-  }
-
-  async function startCall(type = 'audio') {
-    if (!selectedUser) return;
-    currentCallType = type;
-    isCallConnected = false;
-
-    currentCallId = getChatRoomId(currentUser.uid, selectedUser.uid);
-    const callDocRef = db.collection("calls").doc(currentCallId);
-
-    const pc = await initPeerConnection(callDocRef, type === 'video');
-    if (!pc) return;
-
-    const callerCandidates = callDocRef.collection('callerCandidates');
-    pc.onicecandidate = event => { if (event.candidate) callerCandidates.add(event.candidate.toJSON()); };
-
-    const offerDescription = await pc.createOffer();
-    await pc.setLocalDescription(offerDescription);
-
-    await callDocRef.set({
-      callerUid: currentUser.uid,
-      callerName: currentUser.displayName || currentUser.email,
-      receiverUid: selectedUser.uid,
-      callType: type,
-      offer: { type: offerDescription.type, sdp: offerDescription.sdp },
-      status: "calling",
-      timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    });
-
-    document.getElementById('callOverlay').classList.remove('hidden');
-    document.getElementById('audioControls').classList.remove('hidden');
-    document.getElementById('volumeContainer').classList.remove('hidden');
-    document.getElementById('callStatusText').innerText = `${selectedUser.name} ထံ ${type === 'video' ? 'Video' : 'Audio'} ဖုန်းခေါ်ဆိုနေပါသည်...`;
-    document.getElementById('callerNameText').innerText = '';
-    document.getElementById('callActions').innerHTML = `<button class="btn-reject" onclick="endCall()">ဖုန်းချမည်</button>`;
-
-    showCallUI();
-    startRingtone('outgoing');
-    listenCallStatusSync(currentCallId);
-
-    callDocRef.onSnapshot(async snapshot => {
-      const data = snapshot.data();
-      if (data && data.answer && !pc.currentRemoteDescription) {
-        stopRingtone();
-        isCallConnected = true;
-        await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-        document.getElementById('callStatusText').innerText = "စကားပြောနေပါသည်...";
-        showCallUI();
-      }
-    });
-
-    callDocRef.collection('receiverCandidates').onSnapshot(snapshot => {
-      snapshot.docChanges().forEach(change => {
-        if (change.type === 'added') pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
-      });
-    });
+    }).then(() => input.value = '');
   }
 
   function listenIncomingCalls() {
-    db.collection("calls").where("receiverUid", "==", currentUser.uid)
-      .onSnapshot(snapshot => {
-        snapshot.docChanges().forEach(change => {
-          const data = change.doc.data();
-          if (change.type === "added" || change.type === "modified") {
-            if (data.status === "calling" && data.callerUid !== currentUser.uid) {
-              currentCallId = change.doc.id;
-              currentCallType = data.callType || 'audio';
-              isCallConnected = false;
-              
-              db.collection("users").doc(data.callerUid).get().then(doc => {
-                const caller = doc.exists ? doc.data() : { name: data.callerName, uid: data.callerUid };
-                showTopBanner("📞", caller.name, `${currentCallType === 'video' ? 'Video' : 'Audio'} ဖုန်းခေါ်ဆိုနေသည်...`, caller);
-              });
-
-              showIncomingCallUI(data.callerName, currentCallType);
-              listenCallStatusSync(currentCallId);
-            }
-          }
+    db.collection("calls").where("receiverUid", "==", currentUser.uid).where("status", "==", "calling")
+      .onSnapshot(snap => {
+        snap.forEach(doc => {
+          const data = doc.data();
+          triggerStrobeNotification();
+          document.getElementById('callOverlay').classList.remove('hidden');
+          document.getElementById('callStatusText').innerText = "ဖုန်းဝင်လာပါသည်!";
+          document.getElementById('callerNameText').innerText = data.callerName;
+          document.getElementById('callActions').innerHTML = `
+            <button class="btn-accept" onclick="acceptCall('${doc.id}')">ကိုင်မည်</button>
+            <button class="btn-reject" onclick="endCall('${doc.id}')">ငြင်းမည်</button>
+          `;
         });
       });
   }
 
-  function showIncomingCallUI(callerName, type) {
-    document.getElementById('callOverlay').classList.remove('hidden');
-    document.getElementById('audioControls').classList.add('hidden');
-    document.getElementById('volumeContainer').classList.add('hidden');
-    document.getElementById('callStatusText').innerText = `${type === 'video' ? 'Video' : 'Audio'} ဖုန်းဝင်လာပါသည်!`;
-    document.getElementById('callerNameText').innerText = `${callerName} ထံမှ ခေါ်ဆိုနေသည်`;
-    document.getElementById('callActions').innerHTML = `
-      <button class="btn-accept" onclick="acceptCall()">ကိုင်မည်</button>
-      <button class="btn-reject" onclick="endCall()">ငြင်းမည်</button>
-    `;
-    showCallUI();
-    startRingtone('incoming');
-  }
-
-  async function acceptCall() {
-    stopRingtone();
-    dismissBanner();
-    if (!currentCallId) return;
-
-    const callDocRef = db.collection("calls").doc(currentCallId);
-    const callData = (await callDocRef.get()).data();
-    if (!callData) return;
-
-    const pc = await initPeerConnection(callDocRef, callData.callType === 'video');
-    if (!pc) return;
-
-    const receiverCandidates = callDocRef.collection('receiverCandidates');
-    pc.onicecandidate = event => { if (event.candidate) receiverCandidates.add(event.candidate.toJSON()); };
-
-    await pc.setRemoteDescription(new RTCSessionDescription(callData.offer));
-    const answerDescription = await pc.createAnswer();
-    await pc.setLocalDescription(answerDescription);
-
-    await callDocRef.update({
-      answer: { type: answerDescription.type, sdp: answerDescription.sdp },
-      status: "connected"
-    });
-
-    callDocRef.collection('callerCandidates').onSnapshot(snapshot => {
-      snapshot.docChanges().forEach(change => {
-        if (change.type === 'added') pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
-      });
-    });
-
-    isCallConnected = true;
-    document.getElementById('audioControls').classList.remove('hidden');
-    document.getElementById('volumeContainer').classList.remove('hidden');
-    document.getElementById('callStatusText').innerText = "စကားပြောနေပါသည်...";
-    document.getElementById('callActions').innerHTML = `<button class="btn-reject" onclick="endCall()">ဖုန်းချမည်</button>`;
+  async function startCall() {
+    if (!selectedUser) return alert("ဖုန်းခေါ်ဆိုရန် လူရွေးပါ");
+    const callId = currentUser.uid < selectedUser.uid ? `${currentUser.uid}_${selectedUser.uid}` : `${selectedUser.uid}_${currentUser.uid}`;
     
-    showCallUI();
-  }
-
-  function toggleMic() {
-    if (!localStream) return;
-    const track = localStream.getAudioTracks()[0];
-    if (track) {
-      isMicMuted = !isMicMuted;
-      track.enabled = !isMicMuted;
-      const btn = document.getElementById('toggleMicBtn');
-      btn.classList.toggle('off', isMicMuted);
-    }
-  }
-
-  function toggleAudio() {
-    const remoteAudio = document.getElementById('remoteAudio');
-    isAudioMuted = !isAudioMuted;
-    remoteAudio.muted = isAudioMuted;
-    const btn = document.getElementById('toggleAudioBtn');
-    btn.classList.toggle('off', isAudioMuted);
-  }
-
-  function toggleCam() {
-    if (!localStream) return;
-    const videoTrack = localStream.getVideoTracks()[0];
-    if (videoTrack) {
-      isCamOff = !isCamOff;
-      videoTrack.enabled = !isCamOff;
-      const btn = document.getElementById('toggleCamBtn');
-      btn.classList.toggle('off', isCamOff);
-    }
-  }
-
-  async function toggleTorch() {
-    if (!localStream) return;
-    const videoTrack = localStream.getVideoTracks()[0];
-    if (videoTrack) {
-      try {
-        isTorchOn = !isTorchOn;
-        await videoTrack.applyConstraints({ advanced: [{ torch: isTorchOn }] });
-        const btn = document.getElementById('toggleTorchBtn');
-        btn.classList.toggle('off', !isTorchOn);
-      } catch (e) {
-        alert("သင့်ဖုန်း Device သည် Flashlight Control ကို Support မလုပ်ပါ။");
-      }
-    }
-  }
-
-  function changeVolume(val) {
-    document.getElementById('remoteAudio').volume = val;
-  }
-
-  function listenCallStatusSync(callId) {
-    if (callStateUnsubscribe) callStateUnsubscribe();
-    callStateUnsubscribe = db.collection("calls").doc(callId).onSnapshot(doc => {
-      const data = doc.data();
-      if (!data || data.status === "ended") hideCallUI();
+    await db.collection("calls").doc(callId).set({
+      callerUid: currentUser.uid,
+      callerName: currentUser.displayName || currentUser.email,
+      receiverUid: selectedUser.uid,
+      status: "calling"
     });
+
+    document.getElementById('callOverlay').classList.remove('hidden');
+    document.getElementById('callStatusText').innerText = "ဖုန်းခေါ်ဆိုနေပါသည်...";
   }
 
-  async function endCall() {
-    stopRingtone();
-    dismissBanner();
-    if (currentCallId) {
-      await db.collection("calls").doc(currentCallId).update({ status: "ended" }).catch(() => {});
-    }
-    hideCallUI();
+  function acceptCall(callId) {
+    db.collection("calls").doc(callId).update({ status: "connected" });
+    document.getElementById('callStatusText').innerText = "စကားပြောနေပါသည်...";
   }
 
-  function hideCallUI() {
-    stopRingtone();
-    clearTimeout(uiHideTimeout);
-
-    if (peerConnection) { peerConnection.close(); peerConnection = null; }
-    if (localStream) { localStream.getTracks().forEach(track => track.stop()); localStream = null; }
-    if (callStateUnsubscribe) { callStateUnsubscribe(); callStateUnsubscribe = null; }
-
-    currentCallId = null;
-    isMicMuted = false;
-    isAudioMuted = false;
-    isCamOff = false;
-    isTorchOn = false;
-    isCallConnected = false;
-
+  function endCall(callId) {
+    if(callId) db.collection("calls").doc(callId).update({ status: "ended" });
     document.getElementById('callOverlay').classList.add('hidden');
-    document.getElementById('videoContainer').classList.add('hidden');
-    document.getElementById('audioControls').classList.add('hidden');
-    document.getElementById('volumeContainer').classList.add('hidden');
-    document.getElementById('toggleCamBtn').classList.add('hidden');
-    document.getElementById('toggleTorchBtn').classList.add('hidden');
-    document.getElementById('topUiLayer').classList.remove('autohide');
-    document.getElementById('bottomUiLayer').classList.remove('autohide');
-
-    document.getElementById('remoteAudio').srcObject = null;
-    document.getElementById('remoteVideo').srcObject = null;
-    document.getElementById('localVideo').srcObject = null;
   }
 </script>
-
 </body>
-</html>
+                                                                          </html>
+                                                                          
