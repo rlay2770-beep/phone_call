@@ -2,8 +2,8 @@
 <html lang="my">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Enhanced WebRTC & Chat App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Native Mobile Chat & Call App</title>
 
   <!-- Firebase Web SDK (Compat Engine) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -12,128 +12,142 @@
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-    body { background: #121212; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; }
     
-    .app-card { background: #1e1e1e; width: 100vw; height: 100vh; display: flex; flex-direction: column; overflow: hidden; position: relative; }
-    @media (min-width: 480px) {
-      .app-card { width: 420px; height: 92vh; border-radius: 20px; border: 1px solid #333; }
+    html, body { 
+      width: 100%; 
+      height: 100%; 
+      background: #121212; 
+      color: #fff; 
+      overflow: hidden; 
+    }
+    
+    /* Native App Container Structure (Webview Safe) */
+    .app-card { 
+      width: 100%; 
+      height: 100%; 
+      display: flex; 
+      flex-direction: column; 
+      position: relative; 
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-top: env(safe-area-inset-top);
+      background: #1e1e1e;
     }
     
     .hidden { display: none !important; }
 
-    /* Fixed Native Top Notification (ဖုန်း၏ အထက်ဘက် အပေါ်ဆုံးမှ ကျလာမည့် စနစ်) */
+    /* Native Top Banner Notification (အပေါ်မှ ဆွဲကျလာမည့် စနစ်) */
     .top-notification { 
       position: fixed; 
-      top: 10px; 
-      left: 5%; 
-      right: 5%; 
-      background: rgba(30, 30, 30, 0.95); 
+      top: 12px; 
+      left: 12px; 
+      right: 12px; 
+      background: rgba(30, 30, 30, 0.98); 
       border: 1px solid #0a84ff; 
-      border-radius: 12px; 
-      padding: 12px; 
-      z-index: 99999; 
-      box-shadow: 0 5px 15px rgba(0,0,0,0.6); 
+      border-radius: 14px; 
+      padding: 12px 16px; 
+      z-index: 999999; 
+      box-shadow: 0 8px 24px rgba(0,0,0,0.7); 
       display: flex; 
       flex-direction: column; 
-      gap: 4px; 
-      transform: translateY(-150%); 
-      transition: transform 0.3s ease; 
-      backdrop-filter: blur(8px); 
+      gap: 3px; 
+      transform: translateY(-160%); 
+      transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+      backdrop-filter: blur(10px); 
     }
     .top-notification.show { transform: translateY(0); }
-    .notif-title { font-size: 11px; color: #0a84ff; font-weight: bold; }
-    .notif-body { font-size: 13px; color: #fff; }
+    .notif-title { font-size: 11px; color: #0a84ff; font-weight: bold; text-transform: uppercase; }
+    .notif-body { font-size: 13px; color: #ffffff; font-weight: 500; }
 
-    /* Auth Styling */
-    .auth-box { padding: 30px 20px; display: flex; flex-direction: column; gap: 15px; justify-content: center; height: 100%; text-align: center; }
-    .input-dark { padding: 14px; background: #2a2a2a; border: 1px solid #444; border-radius: 10px; color: white; font-size: 14px; width: 100%; outline: none; }
-    .btn-main { background: #0a84ff; color: white; padding: 14px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 14px; }
+    /* Auth UI */
+    .auth-box { padding: 24px 20px; display: flex; flex-direction: column; gap: 16px; justify-content: center; height: 100%; text-align: center; }
+    .input-dark { padding: 12px 14px; background: #2a2a2a; border: 1px solid #3a3a3c; border-radius: 10px; color: white; font-size: 14px; width: 100%; outline: none; }
+    .input-dark:focus { border-color: #0a84ff; }
+    .btn-main { background: #0a84ff; color: white; padding: 12px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 14px; }
     
-    /* App Layout */
-    .app-header { background: #252525; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
-    .header-user { font-size: 13px; font-weight: 600; color: #0a84ff; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
-    .btn-logout { background: #ff453a; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; }
+    /* Header Bar */
+    .app-header { background: #1c1c1e; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2c2c2e; flex-shrink: 0; }
+    .header-user { font-size: 13px; font-weight: 600; color: #0a84ff; max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .btn-logout { background: #ff453a; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; }
 
-    .tab-bar { display: flex; background: #252525; border-top: 1px solid #333; }
-    .tab-btn { flex: 1; padding: 12px; text-align: center; background: none; border: none; color: #8e8e93; font-weight: 600; font-size: 13px; cursor: pointer; }
-    .tab-btn.active { color: #0a84ff; border-top: 2px solid #0a84ff; }
-
-    .section-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-    .contact-add-bar { padding: 10px; background: #2a2a2a; display: flex; gap: 6px; border-bottom: 1px solid #333; }
-    .contact-list { flex: 1; overflow-y: auto; padding: 10px; }
-    .contact-card { background: #2c2c2e; padding: 12px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border: 1px solid #3a3a3c; }
+    /* Section Flex Box (Scrolling Enabled) */
+    .section-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+    
+    .contact-add-bar { padding: 10px; background: #252525; display: flex; gap: 8px; border-bottom: 1px solid #333; flex-shrink: 0; }
+    .contact-list { flex: 1; overflow-y: auto; padding: 10px; -webkit-overflow-scrolling: touch; }
+    .contact-card { background: #2c2c2e; padding: 12px 14px; border-radius: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border: 1px solid #3a3a3c; }
 
     /* Chat Section */
-    .chat-header { background: #1c1c1e; padding: 10px 14px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
-    .call-btn-group { display: flex; gap: 8px; }
-    .btn-call { border: none; padding: 8px 12px; border-radius: 8px; font-weight: bold; font-size: 12px; color: white; cursor: pointer; }
+    .chat-header { background: #252525; padding: 10px 14px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+    .call-btn-group { display: flex; gap: 6px; }
+    .btn-call { border: none; padding: 6px 10px; border-radius: 6px; font-weight: bold; font-size: 11px; color: white; cursor: pointer; }
     .btn-voice { background: #30d158; }
     .btn-video { background: #5e5ce6; }
 
-    /* Messages & Tick Statuses */
-    .chat-box { flex: 1; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #141414; }
-    .msg { padding: 10px 12px; border-radius: 14px; font-size: 13px; max-width: 78%; word-break: break-word; position: relative; display: flex; flex-direction: column; }
+    .chat-box { flex: 1; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #121212; -webkit-overflow-scrolling: touch; }
+    
+    /* Messages & Ticks */
+    .msg { padding: 8px 12px; border-radius: 14px; font-size: 13px; max-width: 80%; word-break: break-word; display: flex; flex-direction: column; position: relative; }
     .msg.me { background: #0a84ff; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
     .msg.them { background: #2c2c2e; color: white; align-self: flex-start; border-bottom-left-radius: 2px; }
     
-    .msg-meta { display: flex; align-items: center; justify-content: flex-end; gap: 4px; font-size: 10px; color: rgba(255, 255, 255, 0.7); margin-top: 4px; align-self: flex-end; }
+    .msg-meta { display: flex; align-items: center; justify-content: flex-end; gap: 4px; font-size: 9px; color: rgba(255, 255, 255, 0.7); margin-top: 3px; align-self: flex-end; }
     .tick-icon { font-size: 11px; font-weight: bold; letter-spacing: -2px; }
-    .tick-seen { color: #30d158; } /* Read status (Green Ticks) */
+    .tick-seen { color: #30d158; }
 
-    .input-bar { padding: 10px; background: #1c1c1e; border-top: 1px solid #333; display: flex; gap: 8px; }
-    .input-bar textarea { flex: 1; padding: 10px; background: #2c2c2e; border: 1px solid #3a3a3c; border-radius: 8px; color: white; font-size: 13px; resize: none; height: 40px; outline: none; }
-    .btn-send { background: #0a84ff; color: white; border: none; padding: 0 16px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    /* Input Dock Area (Fixed at Bottom Above Safe-Area) */
+    .input-bar { padding: 8px 10px; background: #1c1c1e; border-top: 1px solid #2c2c2e; display: flex; gap: 8px; flex-shrink: 0; }
+    .input-bar textarea { flex: 1; padding: 8px 12px; background: #2c2c2e; border: 1px solid #3a3a3c; border-radius: 18px; color: white; font-size: 13px; resize: none; height: 38px; outline: none; }
+    .btn-send { background: #0a84ff; color: white; border: none; padding: 0 14px; border-radius: 18px; font-weight: bold; cursor: pointer; font-size: 13px; }
 
-    /* Call Screen Overlay */
+    /* Bottom Navigation Tabs */
+    .tab-bar { display: flex; background: #1c1c1e; border-top: 1px solid #2c2c2e; flex-shrink: 0; height: 50px; }
+    .tab-btn { flex: 1; padding: 8px; text-align: center; background: none; border: none; color: #8e8e93; font-weight: 600; font-size: 12px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .tab-btn.active { color: #0a84ff; border-top: 2px solid #0a84ff; }
+
+    /* Full-Screen Call Overlay */
     .call-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: white; display: flex; flex-direction: column; justify-content: space-between; align-items: center; z-index: 1000; overflow: hidden; }
-    
-    .call-info-header { position: absolute; top: 20px; z-index: 10; text-align: center; width: 100%; background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%); padding-bottom: 20px; pointer-events: none; }
-    .call-info-header h4 { font-size: 16px; font-weight: 600; margin-bottom: 2px; }
+    .call-info-header { position: absolute; top: 30px; z-index: 10; text-align: center; width: 100%; background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%); padding-bottom: 20px; pointer-events: none; }
+    .call-info-header h4 { font-size: 15px; font-weight: 600; }
     .call-info-header p { font-size: 12px; color: #30d158; }
 
-    /* Video Frame Position */
     .video-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; display: flex; justify-content: center; align-items: center; }
+    #remoteVideo { width: 100%; height: 100%; object-fit: contain; }
+    #localVideo { position: absolute; top: 80px; right: 14px; width: 90px; height: 135px; object-fit: cover; border-radius: 10px; border: 1.5px solid rgba(255,255,255,0.5); background: #2c2c2e; z-index: 5; }
     
-    #remoteVideo { width: 100%; height: 100%; object-fit: contain; background: #050505; }
-    #localVideo { position: absolute; top: 70px; right: 14px; width: 95px; height: 140px; object-fit: cover; border-radius: 10px; border: 1.5px solid rgba(255,255,255,0.5); background: #2c2c2e; box-shadow: 0 6px 16px rgba(0,0,0,0.6); z-index: 5; }
-    
-    /* Auto-Hiding Call Control Panel */
-    .call-controls-panel { position: absolute; bottom: 24px; z-index: 20; width: 86%; background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(16px); padding: 12px 16px; border-radius: 20px; display: flex; flex-direction: column; gap: 10px; border: 1px solid rgba(255,255,255,0.12); transition: opacity 0.4s ease, transform 0.4s ease; }
+    .call-controls-panel { position: absolute; bottom: 30px; z-index: 20; width: 88%; background: rgba(20, 20, 20, 0.88); backdrop-filter: blur(16px); padding: 12px 16px; border-radius: 20px; display: flex; flex-direction: column; gap: 10px; border: 1px solid rgba(255,255,255,0.12); transition: opacity 0.4s ease, transform 0.4s ease; }
     .call-controls-panel.fade-out { opacity: 0; transform: translateY(20px); pointer-events: none; }
 
     .volume-slider-row { display: flex; align-items: center; gap: 10px; width: 100%; }
     .volume-slider-row input[type="range"] { flex: 1; accent-color: #0a84ff; height: 3px; }
-
     .action-buttons-row { display: flex; justify-content: space-around; align-items: center; width: 100%; }
     
-    .btn-round { width: 44px; height: 44px; border-radius: 50%; border: none; color: white; font-size: 15px; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: transform 0.1s; }
-    .btn-round:active { transform: scale(0.92); }
+    .btn-round { width: 44px; height: 44px; border-radius: 50%; border: none; color: white; font-size: 15px; display: flex; justify-content: center; align-items: center; cursor: pointer; }
     .btn-round.grey { background: rgba(255,255,255,0.22); }
     .btn-round.grey.active { background: #ff9500; }
-    .btn-round.green { background: #30d158; width: 52px; height: 52px; font-size: 18px; }
-    .btn-round.red { background: #ff453a; width: 52px; height: 52px; font-size: 18px; }
+    .btn-round.green { background: #30d158; width: 50px; height: 50px; }
+    .btn-round.red { background: #ff453a; width: 50px; height: 50px; }
   </style>
 </head>
 <body onclick="resetControlHideTimer()">
 
 <div class="app-card" id="appCard">
   
-  <!-- Dynamic Top Notification Bar -->
+  <!-- Top Native-style Notification Banner -->
   <div id="topNotif" class="top-notification">
-    <div class="notif-title" id="notifSender">Message</div>
+    <div class="notif-title" id="notifSender">မက်ဆေ့ခ်ျအသစ်ဝင်လာသည်</div>
     <div class="notif-body" id="notifBody">...</div>
   </div>
 
-  <!-- 1. Auth Section -->
+  <!-- 1. Authentication Screen -->
   <div id="authSection" class="auth-box">
-    <h2 style="color: #0a84ff;">အကောင့်ဝင်ရောက်ရန်</h2>
+    <h2 style="color: #0a84ff; font-size: 20px;">အကောင့်ဝင်ရောက်ရန်</h2>
     <input type="email" id="emailInput" class="input-dark" placeholder="အီးမေးလ် ထည့်ပါ">
     <input type="password" id="passInput" class="input-dark" placeholder="စကားဝှက် ထည့်ပါ">
     <button class="btn-main" onclick="loginWithEmail()">အကောင့်ဝင်မည် / အကောင့်သစ်ဖွင့်မည်</button>
   </div>
 
-  <!-- 2. Main App Section -->
-  <div id="appSection" class="hidden" style="display: flex; flex-direction: column; height: 100%;">
+  <!-- 2. Main Dashboard Section -->
+  <div id="appSection" class="hidden" style="display: flex; flex-direction: column; height: 100%; width: 100%;">
     
     <div class="app-header">
       <div class="header-user" id="userNameDisplay">...</div>
@@ -143,8 +157,8 @@
     <!-- Contacts Tab -->
     <div id="contactsTab" class="section-container">
       <div class="contact-add-bar">
-        <input type="email" id="newContactEmail" class="input-dark" placeholder="အသစ်ထည့်မည့် Email..." style="font-size: 12px; padding: 8px;">
-        <button class="btn-main" onclick="saveContact()" style="padding: 8px 12px; font-size: 12px; white-space: nowrap;">Contact သိမ်းမည်</button>
+        <input type="email" id="newContactEmail" class="input-dark" placeholder="အသစ်ထည့်မည့် Email..." style="font-size: 12px;">
+        <button class="btn-main" onclick="saveContact()" style="padding: 0 12px; font-size: 12px; white-space: nowrap;">သိမ်းမည်</button>
       </div>
       <div class="contact-list" id="contactListContainer"></div>
     </div>
@@ -152,7 +166,7 @@
     <!-- Chat Tab -->
     <div id="chatTab" class="section-container hidden">
       <div class="chat-header">
-        <div style="font-size: 13px; font-weight: bold;" id="selectedChatUserName">အကောင့် ရွေးချယ်မထားပါ</div>
+        <div style="font-size: 12px; font-weight: bold; max-width: 55%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" id="selectedChatUserName">အကောင့် ရွေးချယ်မထားပါ</div>
         <div class="call-btn-group">
           <button class="btn-call btn-voice" onclick="startCall('audio')">📞 Voice</button>
           <button class="btn-call btn-video" onclick="startCall('video')">📹 Video</button>
@@ -160,8 +174,8 @@
       </div>
       
       <div class="chat-box" id="chatBox">
-        <div style="text-align: center; color: #8e8e93; font-size: 12px; margin-top: 20px;" id="chatPlaceholder">
-          Contacts Tab မှ စကားပြောလိုသည့် အကောင့်ကို နှိပ်ပြီး ရွေးချယ်ပါ။
+        <div style="text-align: center; color: #8e8e93; font-size: 12px; margin-top: 30px;" id="chatPlaceholder">
+          Contacts မှ စကားပြောလိုသူကို ရွေးချယ်ပါ။
         </div>
       </div>
 
@@ -171,15 +185,19 @@
       </div>
     </div>
 
-    <!-- Navigation Tabs -->
+    <!-- Bottom Navigation Tabs (Guaranteed Visible) -->
     <div class="tab-bar">
-      <button class="tab-btn active" id="btnTabContacts" onclick="switchTab('contacts')">👥 အဆက်အသွယ်များ</button>
-      <button class="tab-btn" id="btnTabChat" onclick="switchTab('chat')">💬 စကားပြောရန်</button>
+      <button class="tab-btn active" id="btnTabContacts" onclick="switchTab('contacts')">
+        👥 <span>အဆက်အသွယ်</span>
+      </button>
+      <button class="tab-btn" id="btnTabChat" onclick="switchTab('chat')">
+        💬 <span>စကားပြောရန်</span>
+      </button>
     </div>
 
   </div>
 
-  <!-- 3. Full-Screen Call Overlay -->
+  <!-- 3. Call Overlay Screen -->
   <div id="callOverlay" class="call-overlay hidden" onclick="toggleCallControls(event)">
     <div class="call-info-header">
       <h4 id="callUserTitle">User Email</h4>
@@ -226,10 +244,15 @@
 
   let currentUser = null;
   let selectedUser = null;
+  
+  // Real-time Subscriptions Cleaners
   let chatUnsubscribe = null;
+  let contactsUnsubscribe = null;
+  let globalNotifUnsubscribe = null;
+  let incomingCallUnsubscribe = null;
   let callUnsubscribe = null;
 
-  // WebRTC Variables
+  // WebRTC Global State
   let localStream = null;
   let remoteStream = null;
   let peerConnection = null;
@@ -245,7 +268,7 @@
     iceServers: [{ urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }]
   };
 
-  // Auth Handling
+  // Auth State Listener & Fully Reset Clean Sweep
   auth.onAuthStateChanged(user => {
     if (user) {
       currentUser = user;
@@ -262,15 +285,33 @@
       listenIncomingCalls();
       listenGlobalNotifications();
     } else {
+      // Clear All Active Listeners & Reset UI on Logout
+      clearAllSubscriptions();
+      currentUser = null;
+      selectedUser = null;
+      
+      document.getElementById('chatBox').innerHTML = '';
+      document.getElementById('contactListContainer').innerHTML = '';
+      document.getElementById('selectedChatUserName').innerText = 'အကောင့် ရွေးချယ်မထားပါ';
+      
       document.getElementById('authSection').classList.remove('hidden');
       document.getElementById('appSection').classList.add('hidden');
     }
   });
 
+  function clearAllSubscriptions() {
+    if (chatUnsubscribe) { chatUnsubscribe(); chatUnsubscribe = null; }
+    if (contactsUnsubscribe) { contactsUnsubscribe(); contactsUnsubscribe = null; }
+    if (globalNotifUnsubscribe) { globalNotifUnsubscribe(); globalNotifUnsubscribe = null; }
+    if (incomingCallUnsubscribe) { incomingCallUnsubscribe(); incomingCallUnsubscribe = null; }
+    if (callUnsubscribe) { callUnsubscribe(); callUnsubscribe = null; }
+  }
+
   function loginWithEmail() {
     const email = document.getElementById('emailInput').value.trim();
     const pass = document.getElementById('passInput').value.trim();
-    if(!email || !pass) return alert("Email နှင့် Password ထည့်ပါ");
+    if(!email || !pass) return alert("Email နှင့် Password ဖြည့်သွင်းပါ");
+    
     auth.signInWithEmailAndPassword(email, pass).catch(() => {
       auth.createUserWithEmailAndPassword(email, pass).catch(e => alert(e.message));
     });
@@ -289,12 +330,156 @@
     } else {
       document.getElementById('contactsTab').classList.add('hidden');
       document.getElementById('chatTab').classList.remove('hidden');
-      document.getElementById('btnTabChat').classList.active && document.getElementById('btnTabChat').classList.add('active');
+      document.getElementById('btnTabChat').classList.add('active');
       document.getElementById('btnTabContacts').classList.remove('active');
     }
   }
 
-  // --- Auto-Hiding Controls Logic ---
+  // Pure Room ID Logic
+  function getRoomId(email1, email2) {
+    const clean1 = email1.toLowerCase().replace(/[^a-zA-Z0-9]/g, "_");
+    const clean2 = email2.toLowerCase().replace(/[^a-zA-Z0-9]/g, "_");
+    return clean1 < clean2 ? `${clean1}_${clean2}` : `${clean2}_${clean1}`;
+  }
+
+  function saveContact() {
+    const email = document.getElementById('newContactEmail').value.trim().toLowerCase();
+    if (!email) return alert("Email ထည့်ပါ");
+    if (email === currentUser.email) return alert("မိမိ Email ကို ထည့်၍မရပါ");
+
+    db.collection("users").doc(currentUser.uid).collection("contacts").doc(email.replace(/[^a-zA-Z0-9]/g, "_")).set({
+      email: email
+    }).then(() => {
+      document.getElementById('newContactEmail').value = '';
+    });
+  }
+
+  function loadContacts() {
+    if (contactsUnsubscribe) contactsUnsubscribe();
+    contactsUnsubscribe = db.collection("users").doc(currentUser.uid).collection("contacts").onSnapshot(snap => {
+      const container = document.getElementById('contactListContainer');
+      container.innerHTML = '';
+      if (snap.empty) {
+        container.innerHTML = `<div style="text-align:center; color:#8e8e93; font-size:12px; margin-top:20px;">Contact စာရင်း မရှိသေးပါ။</div>`;
+        return;
+      }
+      snap.forEach(doc => {
+        const c = doc.data();
+        const card = document.createElement('div');
+        card.className = 'contact-card';
+        card.innerHTML = `
+          <div>
+            <div style="font-weight:bold; font-size:13px;">${c.email.split('@')[0]}</div>
+            <div style="font-size:10px; color:#8e8e93;">${c.email}</div>
+          </div>
+          <span style="color:#0a84ff; font-size:12px; font-weight:bold;">💬 ပြောမည်</span>
+        `;
+        card.onclick = () => selectUserToChat(c.email);
+        container.appendChild(card);
+      });
+    });
+  }
+
+  function selectUserToChat(email) {
+    selectedUser = { email: email.toLowerCase() };
+    document.getElementById('selectedChatUserName').innerText = selectedUser.email;
+    document.getElementById('chatPlaceholder').classList.add('hidden');
+    switchTab('chat');
+    listenMessages();
+  }
+
+  // --- Real-time Chat & Read Ticks (✓ / ✓✓) Logic ---
+  function listenMessages() {
+    if (!selectedUser || !currentUser) return;
+    if (chatUnsubscribe) chatUnsubscribe();
+
+    const roomId = getRoomId(currentUser.email, selectedUser.email);
+    
+    chatUnsubscribe = db.collection("chats").doc(roomId).collection("messages").orderBy("timestamp", "asc")
+      .onSnapshot(snap => {
+        const box = document.getElementById('chatBox');
+        box.innerHTML = '';
+        snap.forEach(doc => {
+          const m = doc.data();
+          
+          // အကောင့်ဖွင့်ထားချိန် အခြားသူပို့ထားသည့် စာများကို 'Seen' အဖြစ် အော်တိုပြောင်းမည်
+          if (m.receiverEmail === currentUser.email.toLowerCase() && !m.seen) {
+            doc.ref.update({ seen: true }).catch(() => {});
+          }
+
+          const timeStr = m.timestamp ? new Date(m.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+          
+          let tickStatus = '';
+          if (m.senderEmail === currentUser.email.toLowerCase()) {
+            tickStatus = m.seen 
+              ? `<span class="tick-icon tick-seen">✓✓</span>` 
+              : `<span class="tick-icon">✓</span>`;
+          }
+
+          const div = document.createElement('div');
+          div.className = `msg ${m.senderEmail === currentUser.email.toLowerCase() ? 'me' : 'them'}`;
+          div.innerHTML = `
+            <div>${m.text}</div>
+            <div class="msg-meta">
+              <span>${timeStr}</span>
+              ${tickStatus}
+            </div>
+          `;
+          box.appendChild(div);
+        });
+        box.scrollTop = box.scrollHeight;
+      });
+  }
+
+  function sendMessage() {
+    if (!selectedUser) return alert("အဆက်အသွယ် ရွေးချယ်ပါ");
+    const input = document.getElementById('msgInput');
+    const msgText = input.value.trim();
+    if (!msgText) return;
+
+    input.value = '';
+
+    const roomId = getRoomId(currentUser.email, selectedUser.email);
+    db.collection("chats").doc(roomId).collection("messages").add({
+      text: msgText,
+      senderEmail: currentUser.email.toLowerCase(),
+      receiverEmail: selectedUser.email.toLowerCase(),
+      seen: false,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+
+  // Global Notification Top Dropdown Listener
+  function listenGlobalNotifications() {
+    if (globalNotifUnsubscribe) globalNotifUnsubscribe();
+    globalNotifUnsubscribe = db.collectionGroup("messages")
+      .where("receiverEmail", "==", currentUser.email.toLowerCase())
+      .onSnapshot(snap => {
+        snap.docChanges().forEach(change => {
+          if (change.type === "added") {
+            const data = change.doc.data();
+            // အခြားသူထံမှ စာလာပါက အပေါ်မှ Dropdown ကျလာမည်
+            if (data.senderEmail !== currentUser.email.toLowerCase()) {
+              showTopNotification(data.senderEmail, data.text);
+            }
+          }
+        });
+      });
+  }
+
+  function showTopNotification(sender, text) {
+    const notif = document.getElementById('topNotif');
+    document.getElementById('notifSender').innerText = `${sender.split('@')[0]} ထံမှ စာရောက်လာသည်`;
+    document.getElementById('notifBody').innerText = text;
+    notif.classList.add('show');
+    startHardwareFlashlight();
+    setTimeout(() => {
+      notif.classList.remove('show');
+      stopHardwareFlashlight();
+    }, 3500);
+  }
+
+  // --- Call Control Auto Hide & Flash Controls ---
   function resetControlHideTimer() {
     const panel = document.getElementById('controlsPanel');
     if (!panel) return;
@@ -318,7 +503,6 @@
     }
   }
 
-  // --- Hardware Flashlight ---
   async function startHardwareFlashlight() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
@@ -381,148 +565,9 @@
     resetControlHideTimer();
   }
 
-  function saveContact() {
-    const email = document.getElementById('newContactEmail').value.trim().toLowerCase();
-    if (!email) return alert("Email ရိုက်ထည့်ပါ");
-    if (email === currentUser.email) return alert("မိမိ Email ကို သိမ်း၍ မရပါ");
-
-    db.collection("users").doc(currentUser.uid).collection("contacts").doc(email.replace(/[^a-zA-Z0-9]/g, "_")).set({
-      email: email
-    }).then(() => {
-      alert("Contact သိမ်းဆည်းပြီးပါပြီ");
-      document.getElementById('newContactEmail').value = '';
-      loadContacts();
-    });
-  }
-
-  function loadContacts() {
-    db.collection("users").doc(currentUser.uid).collection("contacts").onSnapshot(snap => {
-      const container = document.getElementById('contactListContainer');
-      container.innerHTML = '';
-      if (snap.empty) {
-        container.innerHTML = `<div style="text-align:center; color:#8e8e93; font-size:12px; margin-top:20px;">Contact စာရင်း မရှိသေးပါ။ ထည့်သွင်းပါ။</div>`;
-        return;
-      }
-      snap.forEach(doc => {
-        const c = doc.data();
-        const card = document.createElement('div');
-        card.className = 'contact-card';
-        card.innerHTML = `
-          <div>
-            <div style="font-weight:bold; font-size:14px;">${c.email.split('@')[0]}</div>
-            <div style="font-size:11px; color:#8e8e93;">${c.email}</div>
-          </div>
-          <span style="color:#0a84ff; font-size:12px; font-weight:bold;">💬 Chat</span>
-        `;
-        card.onclick = () => selectUserToChat(c.email);
-        container.appendChild(card);
-      });
-    });
-  }
-
-  async function selectUserToChat(email) {
-    selectedUser = { email: email.toLowerCase() };
-    document.getElementById('selectedChatUserName').innerText = selectedUser.email;
-    document.getElementById('chatPlaceholder').classList.add('hidden');
-    switchTab('chat');
-    listenMessages();
-  }
-
-  // --- Email-Based Room ID Generator (အမြဲတမ်း စာပို့စနစ် မှန်ကန်စေမည့် အဆင့်) ---
-  function getRoomId(email1, email2) {
-    const clean1 = email1.toLowerCase().replace(/[^a-zA-Z0-9]/g, "_");
-    const clean2 = email2.toLowerCase().replace(/[^a-zA-Z0-9]/g, "_");
-    return clean1 < clean2 ? `${clean1}_${clean2}` : `${clean2}_${clean1}`;
-  }
-
-  // --- Real-Time Chat & Read Status (Ticks & Timestamp) Fix ---
-  function listenMessages() {
-    if (!selectedUser || !currentUser) return;
-    if (chatUnsubscribe) chatUnsubscribe();
-
-    const roomId = getRoomId(currentUser.email, selectedUser.email);
-    
-    chatUnsubscribe = db.collection("chats").doc(roomId).collection("messages").orderBy("timestamp", "asc")
-      .onSnapshot(snap => {
-        const box = document.getElementById('chatBox');
-        box.innerHTML = '';
-        snap.forEach(doc => {
-          const m = doc.data();
-          
-          // အခြားသူ ပို့ထားသော စာအား ကြည့်ရှုပါက seen: true ပြောင်းမည်
-          if (m.receiverEmail === currentUser.email.toLowerCase() && !m.seen) {
-            doc.ref.update({ seen: true }).catch(() => {});
-          }
-
-          const timeStr = m.timestamp ? new Date(m.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'နားနား';
-          
-          let tickStatus = '';
-          if (m.senderEmail === currentUser.email.toLowerCase()) {
-            tickStatus = m.seen ? `<span class="tick-icon tick-seen">✓✓</span>` : `<span class="tick-icon">✓</span>`;
-          }
-
-          const div = document.createElement('div');
-          div.className = `msg ${m.senderEmail === currentUser.email.toLowerCase() ? 'me' : 'them'}`;
-          div.innerHTML = `
-            <div>${m.text}</div>
-            <div class="msg-meta">
-              <span>${timeStr}</span>
-              ${tickStatus}
-            </div>
-          `;
-          box.appendChild(div);
-        });
-        box.scrollTop = box.scrollHeight;
-      });
-  }
-
-  function sendMessage() {
-    if (!selectedUser) return alert("အဆက်အသွယ်များထဲမှ လူတစ်ဦးကို အရင်ရွေးချယ်ပါ");
-    const input = document.getElementById('msgInput');
-    const msgText = input.value.trim();
-    if (!msgText) return;
-
-    input.value = '';
-
-    const roomId = getRoomId(currentUser.email, selectedUser.email);
-    db.collection("chats").doc(roomId).collection("messages").add({
-      text: msgText,
-      senderEmail: currentUser.email.toLowerCase(),
-      receiverEmail: selectedUser.email.toLowerCase(),
-      seen: false,
-      timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    }).catch(err => {
-      alert("စာပို့ရာတွင် အမှားရှိပါသည်: " + err.message);
-    });
-  }
-
-  function listenGlobalNotifications() {
-    db.collectionGroup("messages").where("receiverEmail", "==", currentUser.email.toLowerCase())
-      .onSnapshot(snap => {
-        snap.docChanges().forEach(change => {
-          if (change.type === "added") {
-            const data = change.doc.data();
-            showTopNotification(data.senderEmail, data.text);
-          }
-        });
-      });
-  }
-
-  function showTopNotification(sender, text) {
-    const notif = document.getElementById('topNotif');
-    document.getElementById('notifSender').innerText = `Message from ${sender}`;
-    document.getElementById('notifBody').innerText = text;
-    notif.classList.add('show');
-    startHardwareFlashlight();
-    setTimeout(() => {
-      notif.classList.remove('show');
-      stopHardwareFlashlight();
-    }, 3000);
-  }
-
-  // --- WebRTC Call Functions ---
+  // --- WebRTC Call Logic ---
   async function startCall(type) {
-    if (!selectedUser) return alert("ဖုန်းခေါ်ဆိုရန် အဆက်အသွယ် ရွေးချယ်ပါ");
+    if (!selectedUser) return alert("ဖုန်းခေါ်ဆိုရန် အဆက်အသွယ် ရွေးပါ");
 
     const callDoc = db.collection("calls").doc();
     currentCallDocId = callDoc.id;
@@ -596,7 +641,8 @@
   }
 
   function listenIncomingCalls() {
-    db.collection("calls").where("receiverEmail", "==", currentUser.email.toLowerCase()).where("status", "==", "calling")
+    if (incomingCallUnsubscribe) incomingCallUnsubscribe();
+    incomingCallUnsubscribe = db.collection("calls").where("receiverEmail", "==", currentUser.email.toLowerCase()).where("status", "==", "calling")
       .onSnapshot(snapshot => {
         snapshot.docChanges().forEach(async change => {
           if (change.type === "added") {
